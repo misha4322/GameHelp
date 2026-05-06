@@ -1,0 +1,418 @@
+.page {
+  min-height: 100vh;
+  padding: 18px 16px 26px;
+  color: #fff;
+}
+
+.card {
+  max-width: 1280px;
+  margin: 0 auto;
+  border-radius: 24px;
+  background: rgba(7, 10, 28, 0.92);
+  border: 1px solid rgba(161, 119, 255, 0.18);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  overflow: hidden;
+  backdrop-filter: blur(18px);
+}
+
+.bannerWrap {
+  position: relative;
+}
+
+.banner,
+.bannerPlaceholder {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(168, 85, 247, 0.35), transparent 28%),
+    linear-gradient(135deg, rgba(91, 33, 182, 0.5), rgba(29, 78, 216, 0.18));
+}
+
+.bannerBack {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.bannerBack .backButton {
+  pointer-events: auto;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.errorBox,
+.loadingBox,
+.message,
+.privateBox,
+.emptyBox {
+  margin: 18px 22px 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(161, 119, 255, 0.1);
+}
+
+.headerActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.friendPanel {
+  margin: 18px 22px 0;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(161, 119, 255, 0.12);
+}
+
+.friendPanelTitle {
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.backButton,
+.primaryButton,
+.secondaryButton,
+.dangerButton,
+.disabledButton {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  text-decoration: none;
+  transition: 0.2s ease;
+}
+
+.backButton,
+.secondaryButton {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(161, 119, 255, 0.14);
+}
+
+.primaryButton {
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+}
+
+.dangerButton {
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  cursor: pointer;
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.btnWithIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.disabledButton {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: not-allowed;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 20px;
+  align-items: center;
+  padding: 0 22px;
+  margin-top: -46px;
+  position: relative;
+  z-index: 1;
+}
+
+.avatar,
+.avatarPlaceholder {
+  width: 140px;
+  height: 140px;
+  border-radius: 24px;
+  object-fit: cover;
+  border: 4px solid rgba(7, 10, 28, 0.95);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.avatarPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  font-weight: 900;
+}
+
+.title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.82);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 22px 0;
+}
+
+.statCard {
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(161, 119, 255, 0.1);
+}
+
+.statValue {
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.statLabel {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 12px;
+  margin: 20px 22px 0;
+  align-items: stretch;
+}
+
+.section {
+  margin: 20px 22px 0;
+  padding: 20px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(161, 119, 255, 0.1);
+}
+
+.columns .section {
+  margin: 0;
+}
+
+.sectionGames {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sectionGames .sectionTitle {
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.bio {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.infoList {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.link {
+  color: #d8b4fe;
+  text-decoration: none;
+}
+
+.link:hover {
+  color: #f3e8ff;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tag {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(167, 139, 250, 0.18);
+  font-size: 14px;
+}
+
+.postsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.postCard {
+  display: block;
+  overflow: hidden;
+  text-decoration: none;
+  color: #fff;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(161, 119, 255, 0.1);
+}
+
+.postImage,
+.postImagePlaceholder {
+  width: 100%;
+  height: 170px;
+  display: block;
+  object-fit: cover;
+}
+
+.postImagePlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.postBody {
+  padding: 14px;
+}
+
+.postTitle {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.postDate {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .statsGrid,
+  .columns,
+  .postsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding: 14px 10px 20px;
+  }
+
+  .hero,
+  .friendPanel,
+  .statsGrid,
+  .columns,
+  .section,
+  .errorBox,
+  .loadingBox,
+  .message,
+  .privateBox,
+  .emptyBox {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .hero {
+    padding: 0 12px;
+    margin-top: -34px;
+  }
+
+  .title {
+    font-size: 26px;
+  }
+
+  .headerActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .backButton,
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton,
+  .disabledButton {
+    width: 100%;
+  }
+
+  .section {
+    padding: 16px;
+  }
+}
+
+.uuidRow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
+.uuidCode {
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  max-width: 100%;
+  word-break: break-all;
+}
+
+@media (max-width: 360px) {
+  .hero {
+    gap: 12px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .avatar,
+  .avatarPlaceholder {
+    width: 108px;
+    height: 108px;
+    border-radius: 20px;
+  }
+
+}

@@ -1,0 +1,60 @@
+.warnings-bar-wrap {
+  padding-top: 12px;
+  padding-bottom: 0;
+}
+
+.warnings-bar-card {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  color: #fef9c3;
+}
+
+.warnings-bar-title {
+  font-weight: 800;
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.warnings-bar-reason {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.warnings-bar-quote {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 3px solid rgba(250, 204, 21, 0.6);
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.warnings-bar-quote-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(254, 249, 195, 0.75);
+  margin-bottom: 6px;
+}
+
+.warnings-bar-dismiss {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: rgba(0, 0, 0, 0.15);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.warnings-bar-dismiss:hover {
+  background: rgba(0, 0, 0, 0.25);
+}

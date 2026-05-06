@@ -1,0 +1,177 @@
+.wrap {
+  margin-top: 8px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.staffMod {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(124, 58, 237, 0.18);
+  color: #ede9fe;
+  transition: 0.2s ease;
+}
+
+.staffMod:hover {
+  background: rgba(124, 58, 237, 0.28);
+}
+
+@media (max-width: 520px) {
+  .row {
+    flex-direction: column;
+  }
+
+  .row > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.btnPrimary,
+.btnGhost,
+.btnDanger,
+.warn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.btnPrimary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--violet), #5b21b6);
+  border-color: rgba(167, 139, 250, 0.35);
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.22);
+}
+
+.btnPrimary:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.btnDanger {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+.btnDanger:disabled,
+.warn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.warn {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.warn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.reportOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.reportBox {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 20px;
+  padding: 20px;
+  background: #14141c;
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
+}
+
+.reportTitle {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.reportHint {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.reportTextarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 12px 14px;
+  font: inherit;
+  outline: none;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.reportTextarea:focus {
+  border-color: rgba(167, 139, 250, 0.45);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+.reportActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.btnGhost {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.btnGhost:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.btnWarn {
+  color: #fff;
+  background: linear-gradient(135deg, #d97706, #b45309);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.btnWarn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

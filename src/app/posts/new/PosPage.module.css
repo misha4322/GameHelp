@@ -1,0 +1,49 @@
+.page {
+  min-height: 100vh;
+  color: var(--text);
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.kicker {
+  color: var(--violet-3);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.subtitle {
+  margin: 12px 0 0;
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.shell {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 28px;
+  padding: 22px;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 32px;
+  }
+
+  .shell {
+    padding: 16px;
+    border-radius: 22px;
+  }
+}

@@ -1,0 +1,156 @@
+.register-form {
+  display: grid;
+  gap: 16px;
+}
+
+.register-group {
+  display: grid;
+  gap: 8px;
+}
+
+.register-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.register-label {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.register-toggle-text {
+  background: none;
+  border: none;
+  color: #c4b5fd;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+
+.register-toggle-text:hover {
+  color: #fff;
+}
+
+.register-input-wrap {
+  position: relative;
+}
+
+.register-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.register-input {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  padding: 0 14px 0 42px;
+  outline: none;
+  transition: 0.2s ease;
+}
+
+.register-input::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.register-input:focus {
+  border-color: rgba(167, 139, 250, 0.7);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.14);
+}
+
+.register-input-password {
+  padding-right: 48px;
+}
+
+.register-eye-button {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.56);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.register-eye-button:hover {
+  color: #fff;
+}
+
+.register-eye-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.register-hint {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 12px;
+}
+
+.register-submit {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(167, 139, 250, 0.36);
+  background: linear-gradient(135deg, #7c3aed, #a21caf);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.register-submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.register-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.register-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: registerSpin 0.8s linear infinite;
+}
+
+.register-error {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.34);
+  background: rgba(239, 68, 68, 0.14);
+  color: #fecaca;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+@keyframes registerSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,306 @@
+.comment-report-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  min-height: 100dvh;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(5, 8, 20, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: report-fade-in 0.24s ease;
+}
+
+.comment-report-dialog {
+  position: relative;
+  width: 100%;
+  max-width: min(520px, 100vw - 32px);
+  max-height: min(90dvh, 100%);
+  margin: auto;
+  flex-shrink: 0;
+  overflow: auto;
+  border-radius: 18px;
+  padding: clamp(16px, 4vw, 22px);
+  background: linear-gradient(165deg, #1a2040 0%, #12162c 100%);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 24px 80px rgba(0, 0, 0, 0.65),
+    0 0 120px rgba(124, 58, 237, 0.12);
+  animation: report-pop 0.26s ease;
+  will-change: transform;
+}
+
+.comment-report-title {
+  margin: 0 0 8px;
+  font-size: clamp(17px, 4.2vw, 20px);
+  font-weight: 800;
+  color: #fff;
+}
+
+.comment-report-intro {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.comment-report-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-report-details {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.comment-report-details-custom {
+  margin-top: 4px;
+}
+
+.comment-report-summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #e8e8f0;
+  list-style: none;
+}
+
+.comment-report-summary::-webkit-details-marker {
+  display: none;
+}
+
+.comment-report-summary::after {
+  content: "▸";
+  float: right;
+  opacity: 0.55;
+  transition: transform 0.15s ease;
+}
+
+.comment-report-details[open] .comment-report-summary::after {
+  transform: rotate(90deg);
+}
+
+.comment-report-details-body {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comment-report-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.comment-report-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.comment-report-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 44px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.comment-report-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.comment-report-textarea:focus-visible {
+  outline: 2px solid rgba(167, 139, 250, 0.85);
+  outline-offset: 2px;
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+}
+
+.comment-report-pick {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(139, 92, 246, 0.15);
+  color: #ddd6fe;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 40px;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.12s ease;
+}
+
+.comment-report-pick:focus-visible {
+  outline: 2px solid rgba(167, 139, 250, 0.85);
+  outline-offset: 2px;
+}
+
+.comment-report-pick:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.comment-report-pick:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.28);
+}
+
+.comment-report-pick.active {
+  border-color: #a78bfa;
+  background: rgba(139, 92, 246, 0.35);
+  color: #fff;
+}
+
+.comment-report-pick:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.comment-report-divider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.comment-report-divider-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.comment-report-divider-label {
+  flex-shrink: 0;
+  max-width: 70%;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.comment-report-warn {
+  margin: 0;
+  font-size: 12px;
+  color: #fb923c;
+}
+
+.comment-report-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fecaca;
+  font-size: 14px;
+}
+
+.comment-report-actions {
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.comment-report-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: filter 0.2s ease, transform 0.12s ease;
+}
+
+.comment-report-btn:focus-visible {
+  outline: 2px solid rgba(167, 139, 250, 0.85);
+  outline-offset: 2px;
+}
+
+.comment-report-btn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.comment-report-btn.cancel {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.comment-report-btn.submit {
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  color: #fff;
+}
+
+.comment-report-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 420px) {
+  .comment-report-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .comment-report-btn {
+    width: 100%;
+  }
+
+  .comment-report-pick {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@keyframes report-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes report-pop {
+  from {
+    transform: translateY(6px) scale(0.985);
+    opacity: 0.95;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comment-report-overlay,
+  .comment-report-dialog {
+    animation: none !important;
+  }
+}

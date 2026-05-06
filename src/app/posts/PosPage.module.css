@@ -1,0 +1,254 @@
+.page {
+  min-height: 100vh;
+  color: var(--text);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.kicker {
+  color: var(--violet-3);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 8px 0 0;
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.subtitle {
+  margin: 12px 0 0;
+  max-width: 720px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 800;
+  transition: 0.2s ease;
+}
+
+.primaryButton {
+  color: #fff;
+  background: linear-gradient(135deg, var(--violet), #5b21b6);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  box-shadow: 0 12px 28px rgba(124, 58, 237, 0.24);
+}
+
+.primaryButton:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.secondaryButton {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+}
+
+.secondaryButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.empty {
+  padding: 26px;
+  border-radius: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  color: var(--muted);
+}
+
+.empty a {
+  color: var(--violet-3);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--text);
+  border-radius: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-strong);
+  background: var(--card2);
+}
+
+.cover,
+.coverPlaceholder {
+  width: 100%;
+  height: 220px;
+  flex-shrink: 0;
+  display: block;
+}
+
+.cover {
+  object-fit: cover;
+}
+
+.coverPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 52px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.3), transparent 26%),
+    linear-gradient(135deg, rgba(17, 24, 39, 0.94), rgba(30, 41, 59, 0.9));
+}
+
+.cardBody {
+  padding: 18px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+
+.cardMeta {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cardStats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.cardStats span {
+  white-space: nowrap;
+}
+
+.friendMark {
+  color: #86efac;
+  font-weight: 700;
+}
+
+.cardTitle {
+  margin-top: 10px;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 900;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  word-break: break-word;
+}
+
+.cardExcerpt {
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.7;
+  font-size: 14px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  word-break: break-word;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tag {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+}
+
+.cardFooter {
+  margin-top: auto;
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 32px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+}
