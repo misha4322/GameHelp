@@ -69,7 +69,7 @@ export default async function AdminPage({
           <h1 className="admin-title">Админ-панель</h1>
           <p className="admin-sub">
             {isAdmin
-              ? "Полный доступ: роли, передача прав, баны, теги форума"
+              ? "Полный доступ: роли, баны, теги форума"
               : "Модератор: список пользователей, бан (кроме админов)"}
           </p>
         </div>

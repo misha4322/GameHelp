@@ -16,7 +16,7 @@ export default function RequestCard({ request, onAccept }: Props) {
         <Link href={`/u/${request.from.id}`} className={styles.userName}>
           {request.from.username}
         </Link>
-        <div className={styles.userMeta}>ID: {request.from.id}</div>
+        <div className={styles.userMeta}>UUID: {request.from.id}</div>
       </div>
 
       <button type="button" className={styles.primaryButton} onClick={() => void onAccept(request.from.id)}>

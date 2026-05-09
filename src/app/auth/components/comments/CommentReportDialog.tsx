@@ -12,6 +12,7 @@ import "./CommentReportDialog.css";
 type Props = {
   open: boolean;
   commentId: string;
+  userId: string | null;
   onClose: () => void;
   onSubmitted?: () => void;
 };
@@ -19,6 +20,7 @@ type Props = {
 export default function CommentReportDialog({
   open,
   commentId,
+  userId,
   onClose,
   onSubmitted,
 }: Props) {
@@ -60,6 +62,10 @@ export default function CommentReportDialog({
 
   async function submit() {
     if (!category || !canSubmit) return;
+    if (!userId) {
+      setError("Сначала войди в аккаунт");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -67,6 +73,7 @@ export default function CommentReportDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId,
           category,
           extraDetail: category !== "custom" ? extraDetail : "",
           customText: category === "custom" ? customText : "",

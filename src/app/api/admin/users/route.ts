@@ -1,47 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { asc, count, desc, ilike, ne, or } from "drizzle-orm";
-import { getStaffContext, requireAdminContext } from "@/lib/admin-server";
-import { isChiefAdmin, ONLY_CHIEF_CAN_TRANSFER } from "@/server/chief-admin";
+import { count, desc, ilike, or } from "drizzle-orm";
+import { getStaffContext } from "@/lib/admin-server";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 
 export const runtime = "nodejs";
 
 const PAGE = 10;
-const CHIEF_PICK_LIMIT = 2000;
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-
-  if (searchParams.get("chiefTransferPick") === "1") {
-    const c = await requireAdminContext();
-    if (c.kind === "response") return c.res;
-    if (!(await isChiefAdmin(c.userId))) {
-      return NextResponse.json({ error: ONLY_CHIEF_CAN_TRANSFER }, { status: 403 });
-    }
-    try {
-      const rows = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          email: users.email,
-        })
-        .from(users)
-        .where(ne(users.id, c.userId))
-        .orderBy(asc(users.username))
-        .limit(CHIEF_PICK_LIMIT);
-      return NextResponse.json({
-        pickList: rows.map((r) => ({
-          id: r.id,
-          username: r.username,
-          email: r.email ?? null,
-        })),
-      });
-    } catch (e) {
-      console.error("GET /api/admin/users chiefTransferPick", e);
-      return NextResponse.json({ error: "Ошибка" }, { status: 500 });
-    }
-  }
 
   const c = await getStaffContext();
   if (c.kind === "response") return c.res;

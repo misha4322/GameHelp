@@ -8,6 +8,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { parseAppRole } from "@/lib/roles";
+import { matchesTempAdminStaff } from "@/lib/temp-admin-bind";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -188,9 +189,12 @@ const callbacks: NextAuthOptions["callbacks"] = {
         token.picture = user.image ?? null;
         const row = await db.query.users.findFirst({
           where: eq(users.id, String(user.id)),
-          columns: { role: true },
+          columns: { role: true, email: true },
         });
         token.role = row?.role ?? "user";
+        if (matchesTempAdminStaff(String(user.id), row?.email ?? user.email)) {
+          token.role = "admin";
+        }
         return token;
       }
 
@@ -211,12 +215,36 @@ const callbacks: NextAuthOptions["callbacks"] = {
           token.name = dbUser.username ?? token.name ?? null;
           token.picture = dbUser.avatarUrl ?? token.picture ?? null;
           token.role = dbUser.role;
+          if (matchesTempAdminStaff(dbUser.id, dbUser.email)) {
+            token.role = "admin";
+          }
         }
       } catch (error) {
         console.error("[next-auth] jwt callback DB error:", error);
       }
 
       return token;
+    }
+
+    const uid = typeof token.userId === "string" ? token.userId : null;
+    if (uid) {
+      try {
+        const row = await db.query.users.findFirst({
+          where: eq(users.id, uid),
+          columns: { role: true, email: true },
+        });
+        if (row) {
+          token.role = row.role;
+          token.email = (token.email as string | null) ?? row.email ?? null;
+        }
+        const emailForBind =
+          (typeof token.email === "string" ? token.email : null) ?? row?.email ?? null;
+        if (matchesTempAdminStaff(uid, emailForBind)) {
+          token.role = "admin";
+        }
+      } catch (error) {
+        console.error("[next-auth] jwt refresh role DB error:", error);
+      }
     }
 
     return token;
@@ -247,15 +275,24 @@ const callbacks: NextAuthOptions["callbacks"] = {
       session.user.name = dbUser?.username ?? (token.name as string | null) ?? null;
       session.user.image =
         dbUser?.avatarUrl ?? (token.picture as string | null) ?? null;
-      session.user.role = parseAppRole(
+      const emailForBind = session.user.email;
+      let role = parseAppRole(
         dbUser?.role ?? (token.role as string | null) ?? "user"
       );
+      if (matchesTempAdminStaff(userId, emailForBind)) {
+        role = "admin";
+      }
+      session.user.role = role;
     } catch (error) {
       console.error("[next-auth] session callback DB error:", error);
       session.user.email = (token.email as string | null) ?? null;
       session.user.name = (token.name as string | null) ?? null;
       session.user.image = (token.picture as string | null) ?? null;
-      session.user.role = parseAppRole((token.role as string | null) ?? "user");
+      let role = parseAppRole((token.role as string | null) ?? "user");
+      if (matchesTempAdminStaff(userId, session.user.email)) {
+        role = "admin";
+      }
+      session.user.role = role;
     }
 
     return session;

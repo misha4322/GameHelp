@@ -2,6 +2,8 @@ import { and, desc, eq, inArray, isNotNull, sql, or } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { comments, friendships, messages, postLikes, posts } from "@/server/db/schema";
+import { RECOMMENDATIONS_API_MAX_LIMIT } from "@/lib/recommendations-display";
+import { loadRecSignalsForViewer, recentConsumptionPenalty } from "@/server/recommendation-signals";
 import type { RecommendationsHomeResponse } from "@/types/recommendations";
 
 type ReasonCode =
@@ -16,7 +18,7 @@ async function getPublishedPosts() {
   return db.query.posts.findMany({
     where: eq(posts.isPublished, true),
     orderBy: [desc(posts.createdAt)],
-    limit: 180,
+    limit: 500,
     with: {
       author: true,
       category: true,
@@ -214,9 +216,34 @@ export async function getRecommendationsHome(
   let friendLikedCounts = new Map<string, number>();
   let friendCommentCounts = new Map<string, number>();
   let friendSharedCounts = new Map<string, number>();
+  const signalByPostId = new Map<
+    string,
+    { lastOpenAt: Date | null; lastClickAt: Date | null }
+  >();
 
   if (viewerId) {
     friendIds = await getFriendIds(viewerId);
+
+    const signalRows = await loadRecSignalsForViewer(viewerId);
+    for (const r of signalRows) {
+      signalByPostId.set(r.postId, {
+        lastOpenAt: r.lastOpenAt,
+        lastClickAt: r.lastClickAt,
+      });
+    }
+
+    const richSignalPostIds = signalRows
+      .filter(
+        (r) =>
+          r.openCount > 0 ||
+          r.clickCount > 0 ||
+          r.impressionCount >= 3 ||
+          (r.impressionCount >= 1 &&
+            r.lastImpressionAt &&
+            Date.now() - r.lastImpressionAt.getTime() < 48 * 60 * 60 * 1000)
+      )
+      .map((r) => r.postId)
+      .filter((id) => postsById.has(id));
 
     const [myLikes, myComments, myShares] = await Promise.all([
       db
@@ -240,6 +267,7 @@ export async function getRecommendationsHome(
         ...myShares
           .map((entry) => entry.postId)
           .filter((id): id is string => typeof id === "string"),
+        ...richSignalPostIds,
       ])
     );
 
@@ -294,13 +322,14 @@ export async function getRecommendationsHome(
     }
   }
 
-  /** Нет истории (лайки/комменты/шеры по постам) и нет друзей — показываем общую ленту как базу для персонализации. */
+  /** Нет истории (лайки/комменты/шеры/просмотры) и нет друзей — шире пул «для вас». */
   const coldStart =
     !!viewerId && preferencePostIds.length === 0 && friendIds.length === 0;
-  const baseLimit = Number(limitRaw ?? 6);
+  const parsed = Number(limitRaw);
+  const baseLimit = Number.isFinite(parsed) && parsed > 0 ? parsed : 48;
   const limit = coldStart
-    ? Math.max(3, Math.min(180, baseLimit))
-    : Math.max(3, Math.min(12, baseLimit));
+    ? Math.max(3, Math.min(220, baseLimit, RECOMMENDATIONS_API_MAX_LIMIT))
+    : Math.max(3, Math.min(baseLimit, RECOMMENDATIONS_API_MAX_LIMIT));
 
   let pool = allPosts.filter((post) => (viewerId ? post.authorId !== viewerId : true));
   if (coldStart && pool.length === 0 && allPosts.length > 0) {
@@ -345,8 +374,20 @@ export async function getRecommendationsHome(
         friendShareCount * 5.5 +
         (friendAuthor ? 6 : 0);
 
+      const consumePen = viewerId
+        ? recentConsumptionPenalty(
+            signalByPostId.get(post.id) ?? { lastOpenAt: null, lastClickAt: null }
+          )
+        : 0;
+
       const total =
-        social + tagMatch + categoryMatch + engagement + freshness + (viewerId ? 0.5 : 0);
+        social +
+        tagMatch +
+        categoryMatch +
+        engagement +
+        freshness +
+        (viewerId ? 0.5 : 0) -
+        consumePen;
 
       const reason = pickReason(
         { total, social, tagMatch, categoryMatch, engagement, freshness },
@@ -375,7 +416,8 @@ export async function getRecommendationsHome(
   const seen = new Set<string>();
   const takeUnique = (
     rows: typeof scored,
-    count: number
+    count: number,
+    maxPerAuthor = 2
   ): ReturnType<typeof buildPostPayload>[] => {
     const output: ReturnType<typeof buildPostPayload>[] = [];
     const authorCap = new Map<string, number>();
@@ -387,7 +429,7 @@ export async function getRecommendationsHome(
       const authorId = row.post.author?.id;
       if (authorId) {
         const alreadyByAuthor = authorCap.get(authorId) ?? 0;
-        if (alreadyByAuthor >= 2) continue;
+        if (alreadyByAuthor >= maxPerAuthor) continue;
       }
 
       seen.add(row.post.id);
@@ -442,10 +484,10 @@ export async function getRecommendationsHome(
     return bFreshTag - aFreshTag;
   });
 
-  const forYou = takeUnique(forYouSource, limit);
-  const fromFriends = takeUnique(fromFriendsSource, limit);
-  const trending = takeUnique(trendingSource, limit);
-  const newInFavoriteTags = takeUnique(favoriteTagsSource, limit);
+  const forYou = takeUnique(forYouSource, limit, 4);
+  const fromFriends = takeUnique(fromFriendsSource, limit, 2);
+  const trending = takeUnique(trendingSource, limit, 2);
+  const newInFavoriteTags = takeUnique(favoriteTagsSource, limit, 2);
 
   return {
     blocks: {

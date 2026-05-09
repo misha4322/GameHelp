@@ -25,7 +25,7 @@ export default function CopyMyIdButton({ myId }: { myId: string }) {
 
   return (
     <button type="button" onClick={copy} className="copy-id-btn">
-      {copied ? "✅ ID скопирован" : "📋 Скопировать мой ID"}
+      {copied ? "✅ UUID скопирован" : "📋 Скопировать мой UUID"}
     </button>
   );
 }

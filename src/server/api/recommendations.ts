@@ -1,12 +1,20 @@
 import { Elysia, t } from "elysia";
 
+import {
+  HOME_FOR_YOU_DEFAULT_LIMIT,
+  RECOMMENDATIONS_API_MAX_LIMIT,
+} from "@/lib/recommendations-display";
 import { getRecommendationsHome } from "../recommendations-service";
 
 export const recommendationsRouter = new Elysia({ prefix: "/recommendations" })
   .get(
     "/home",
     async ({ query }) => {
-      const limit = Math.max(3, Math.min(12, Number(query.limit ?? 6)));
+      const raw = Number(query.limit ?? HOME_FOR_YOU_DEFAULT_LIMIT);
+      const limit = Math.max(
+        3,
+        Math.min(RECOMMENDATIONS_API_MAX_LIMIT, Number.isFinite(raw) ? raw : HOME_FOR_YOU_DEFAULT_LIMIT)
+      );
       const viewerId = query.viewerId?.trim() || null;
       return getRecommendationsHome(viewerId, limit);
     },

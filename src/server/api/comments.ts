@@ -1,12 +1,29 @@
 import { Elysia, t } from "elysia";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
+import { buildStoredCommentReportText } from "@/lib/comment-report-labels";
+import { tagCommentReportReason } from "@/lib/content-report-storage";
+import { clampModerationText } from "@/lib/moderation-text-limit";
 import { checkUserPostingBan } from "@/lib/user-ban";
 
 import { db } from "../db";
-import { commentLikes, comments, posts, users } from "../db/schema";
+import {
+  commentLikes,
+  comments,
+  contentReports,
+  posts,
+  users,
+} from "../db/schema";
+import type { CommentReportReasonCategory } from "../db/schema";
 import type { CommentNode } from "../../types/comments";
 import { applyModerationOrThrow, logModerationEvent } from "../moderation";
+
+const COMMENT_REPORT_CATEGORIES: CommentReportReasonCategory[] = [
+  "insult",
+  "hate",
+  "spam",
+  "custom",
+];
 
 export const commentsRouter = new Elysia()
   .get(
@@ -269,6 +286,88 @@ export const commentsRouter = new Elysia()
       body: t.Object({
         userId: t.String(),
         type: t.Union([t.Literal("like"), t.Literal("dislike")]),
+      }),
+    }
+  )
+
+  .post(
+    "/comments/:commentId/report",
+    async ({ params, body, set }) => {
+      const commentId = params.commentId?.trim();
+      if (!commentId) {
+        set.status = 400;
+        return { error: "Некорректный комментарий" };
+      }
+
+      const reporterId = body.userId?.trim();
+      if (!reporterId) {
+        set.status = 401;
+        return { error: "Нужен вход" };
+      }
+
+      const category = body.category;
+      if (!COMMENT_REPORT_CATEGORIES.includes(category)) {
+        set.status = 400;
+        return { error: "Выберите причину жалобы" };
+      }
+
+      const extraDetail = clampModerationText(String(body.extraDetail ?? "").trim());
+      const customText = clampModerationText(String(body.customText ?? "").trim());
+
+      if (category === "custom" && customText.length < 8) {
+        set.status = 400;
+        return {
+          error: "Опишите проблему подробнее (не меньше 8 символов)",
+        };
+      }
+
+      const row = await db.query.comments.findFirst({
+        where: eq(comments.id, commentId),
+        columns: { id: true, authorId: true, deletedAt: true },
+      });
+
+      if (!row) {
+        set.status = 404;
+        return { error: "Комментарий не найден" };
+      }
+
+      if (row.deletedAt) {
+        set.status = 400;
+        return { error: "Комментарий уже удалён" };
+      }
+
+      if (row.authorId === reporterId) {
+        set.status = 400;
+        return { error: "Нельзя пожаловаться на свой комментарий" };
+      }
+
+      const reasonBody =
+        category === "custom"
+          ? customText
+          : buildStoredCommentReportText(category, extraDetail);
+
+      const reasonStored = clampModerationText(tagCommentReportReason(category, reasonBody));
+
+      await db.insert(contentReports).values({
+        reporterId,
+        targetType: "comment",
+        targetId: row.id,
+        reason: reasonStored,
+      });
+
+      return { ok: true };
+    },
+    {
+      body: t.Object({
+        userId: t.String(),
+        category: t.Union([
+          t.Literal("insult"),
+          t.Literal("hate"),
+          t.Literal("spam"),
+          t.Literal("custom"),
+        ]),
+        extraDetail: t.Optional(t.String()),
+        customText: t.Optional(t.String()),
       }),
     }
   )

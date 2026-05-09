@@ -20,8 +20,6 @@ type Row = {
   createdAt: string | null;
 };
 
-type ChiefTransferPick = { id: string; username: string; email: string | null };
-
 type Stats = {
   users: number;
   posts: number;
@@ -85,10 +83,6 @@ export function AdminClient({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [roleDraft, setRoleDraft] = useState<Record<string, string>>({});
-  const [transferId, setTransferId] = useState("");
-  const [afterTransfer, setAfterTransfer] = useState<"user" | "moderator">("moderator");
-  const [chiefPickList, setChiefPickList] = useState<ChiefTransferPick[] | null>(null);
-  const [chiefPickLoading, setChiefPickLoading] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [postsList, setPostsList] = useState<AdminPost[]>([]);
   const [reports, setReports] = useState<AdminReportRow[]>([]);
@@ -279,45 +273,6 @@ export function AdminClient({
   useEffect(() => {
     void load();
   }, [load, listEpoch]);
-
-  useEffect(() => {
-    const chief = stats?.chiefAdminId ?? null;
-    const iChief = chief !== null && chief === myId;
-    if (activeTab !== "users" || !isAdmin) {
-      return;
-    }
-    if (!iChief) {
-      setChiefPickList(null);
-      setChiefPickLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setChiefPickLoading(true);
-    void (async () => {
-      try {
-        const res = await fetch("/api/admin/users?chiefTransferPick=1", { cache: "no-store" });
-        const data = (await res.json().catch(() => ({}))) as {
-          pickList?: ChiefTransferPick[];
-        };
-        if (cancelled) return;
-        setChiefPickList(Array.isArray(data.pickList) ? data.pickList : []);
-      } catch {
-        if (!cancelled) setChiefPickList([]);
-      } finally {
-        if (!cancelled) setChiefPickLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, isAdmin, stats?.chiefAdminId, myId, listEpoch]);
-
-  useEffect(() => {
-    if (!chiefPickList?.length) return;
-    if (transferId && !chiefPickList.some((x) => x.id === transferId)) {
-      setTransferId("");
-    }
-  }, [chiefPickList, transferId]);
 
   useEffect(() => {
     void (async () => {
@@ -622,33 +577,6 @@ export function AdminClient({
     }
   }
 
-  async function doTransfer() {
-    if (!transferId) {
-      setErr("Выберите нового админа");
-      return;
-    }
-    setSaving("transfer");
-    setErr("");
-    try {
-      const res = await fetch("/api/admin/transfer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          newAdminId: transferId,
-          yourNewRole: afterTransfer,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Ошибка");
-      await update();
-      window.location.href = afterTransfer === "user" ? "/" : "/admin";
-    } catch (e: any) {
-      setErr(e?.message || "Ошибка передачи");
-    } finally {
-      setSaving(null);
-    }
-  }
-
   async function deletePostById(post: AdminPost) {
     if (!window.confirm(`Удалить пост «${post.title}»?`)) return;
     setSaving(`delete-post-${post.id}`);
@@ -689,12 +617,6 @@ export function AdminClient({
   const pageEnd = Math.min(page * usersPageSize, total);
 
   const chiefAdminId = stats?.chiefAdminId ?? null;
-  const iAmChief = chiefAdminId !== null && chiefAdminId === myId;
-
-  /** Не‑главный админ не меняет роль других админов (только главный или сам себе «уйти» с админки). */
-  function roleRowLocked(u: Row): boolean {
-    return !iAmChief && u.role === "admin" && u.id !== myId;
-  }
 
   return (
     <>
@@ -1219,28 +1141,17 @@ export function AdminClient({
                     <td className="admin-td-muted">{u.email ?? "—"}</td>
                     <td>
                       {isAdmin ? (
-                        roleRowLocked(u) ? (
-                          <span
-                            className="admin-muted"
-                            title="Только главный администратор может назначать или снимать роль админа у других"
-                          >
-                            Админ
-                          </span>
-                        ) : (
-                          <select
-                            className="admin-input admin-input-sm"
-                            value={roleDraft[u.id] ?? u.role}
-                            onChange={(e) =>
-                              setRoleDraft((prev) => ({ ...prev, [u.id]: e.target.value }))
-                            }
-                          >
-                            <option value="user">Пользователь</option>
-                            <option value="moderator">Модератор</option>
-                            {iAmChief || (u.role === "admin" && u.id === myId) ? (
-                              <option value="admin">Админ</option>
-                            ) : null}
-                          </select>
-                        )
+                        <select
+                          className="admin-input admin-input-sm"
+                          value={roleDraft[u.id] ?? u.role}
+                          onChange={(e) =>
+                            setRoleDraft((prev) => ({ ...prev, [u.id]: e.target.value }))
+                          }
+                        >
+                          <option value="user">Пользователь</option>
+                          <option value="moderator">Модератор</option>
+                          <option value="admin">Админ</option>
+                        </select>
                       ) : (
                         <span>
                           {u.role === "admin"
@@ -1291,11 +1202,7 @@ export function AdminClient({
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
-                          disabled={
-                            roleRowLocked(u) ||
-                            saving === u.id ||
-                            (roleDraft[u.id] ?? u.role) === u.role
-                          }
+                          disabled={saving === u.id || (roleDraft[u.id] ?? u.role) === u.role}
                           onClick={() => void saveRole(u.id)}
                         >
                           Сохранить роль
@@ -1331,56 +1238,6 @@ export function AdminClient({
               Вперёд
             </button>
           </div>
-        ) : null}
-
-        {isAdmin ? (
-          <>
-            <h2 className="admin-h2 admin-h2-spaced">Передать главные права</h2>
-            <p className="admin-hint">
-              Другой пользователь станет <strong>админом</strong>, у вас останутся права{" "}
-              <strong>модератора</strong> или обычный аккаунт — как выберете ниже.
-            </p>
-            {!iAmChief ? (
-              <p className="admin-hint">
-                Эту операцию может выполнить только главный администратор (метка «Главный» в
-                таблице).
-              </p>
-            ) : null}
-            <div className="admin-transfer">
-              <select
-                className="admin-input"
-                value={transferId}
-                disabled={!iAmChief || chiefPickLoading}
-                onChange={(e) => setTransferId(e.target.value)}
-              >
-                <option value="">
-                  {chiefPickLoading ? "Загрузка списка…" : "— кого сделать админом —"}
-                </option>
-                {(chiefPickList ?? []).map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.username} {u.email ? `(${u.email})` : ""}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="admin-input"
-                value={afterTransfer}
-                disabled={!iAmChief}
-                onChange={(e) => setAfterTransfer(e.target.value as "user" | "moderator")}
-              >
-                <option value="moderator">Я останусь модератором</option>
-                <option value="user">Я останусь обычным пользователем</option>
-              </select>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={saving === "transfer" || !transferId || !iAmChief}
-                onClick={() => void doTransfer()}
-              >
-                {saving === "transfer" ? "…" : "Передать"}
-              </button>
-            </div>
-          </>
         ) : null}
       </section>
       ) : null}

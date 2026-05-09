@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { apiRequest } from "@/lib/api";
 import FriendCard from "./components/FriendCard";
-import { GamepadMarkIcon } from "@/components/icons/GamepadMarkIcon";
+import { FriendSearchIcon } from "@/components/icons/FriendSearchIcon";
 import RequestCard from "./components/RequestCard";
 import SearchUserCard from "./components/SearchUserCard";
 import type { FriendRequest, FriendUser } from "./types";
@@ -294,10 +294,10 @@ export default function FriendsClient({ userId }: { userId: string }) {
           </div>
 
           <div className={styles.section}>
-            <h2 className={`${styles.sectionTitle} ${styles.sectionSearchHeading}`}>
-              <span className={styles.visuallyHidden}>Поиск</span>
-              <GamepadMarkIcon className={styles.searchGamepadIcon} size={24} />
-            </h2>
+            <div className={styles.sectionSearchHeader}>
+              <FriendSearchIcon className={styles.searchFriendIcon} size={26} />
+              <h2 className={`${styles.sectionTitle} ${styles.sectionSearchTitle}`}>Поиск друга</h2>
+            </div>
 
             <div className={styles.row}>
               <input

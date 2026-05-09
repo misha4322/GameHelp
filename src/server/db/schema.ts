@@ -6,6 +6,7 @@ import {
   timestamp,
   boolean,
   integer,
+  index,
   primaryKey,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -186,6 +187,30 @@ export const postLikes = pgTable(
   },
   (t) => ({
     postUserUnique: uniqueIndex("post_likes_post_user_unique").on(t.postId, t.userId),
+  })
+);
+
+/** Сигналы для персональных рекомендаций: показы карточек, клики, открытие поста */
+export const userPostRecSignals = pgTable(
+  "user_post_rec_signals",
+  {
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    postId: uuid("post_id")
+      .references(() => posts.id, { onDelete: "cascade" })
+      .notNull(),
+    lastImpressionAt: timestamp("last_impression_at", { withTimezone: true }),
+    lastClickAt: timestamp("last_click_at", { withTimezone: true }),
+    lastOpenAt: timestamp("last_open_at", { withTimezone: true }),
+    impressionCount: integer("impression_count").notNull().default(0),
+    clickCount: integer("click_count").notNull().default(0),
+    openCount: integer("open_count").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.postId] }),
+    userIdx: index("user_post_rec_signals_user_id_idx").on(t.userId),
   })
 );
 

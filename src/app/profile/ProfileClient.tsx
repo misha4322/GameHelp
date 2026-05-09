@@ -47,7 +47,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
-      setMessage("Не удалось скопировать ID");
+      setMessage("Не удалось скопировать UUID");
     }
   }
 
@@ -121,7 +121,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
               </div>
 
               <div className={styles.meta}>
-                <span>ID: {user.id}</span>
+                <span>UUID: {user.id}</span>
                 {user.createdAt ? (
                   <span>
                     На сайте с {new Date(user.createdAt).toLocaleDateString("ru-RU")}
@@ -131,7 +131,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
               <div className={styles.actions}>
                 <button type="button" className={styles.primaryButton} onClick={copyId}>
-                  {copied ? "✅ ID скопирован" : "📋 Скопировать ID"}
+                  {copied ? "✅ UUID скопирован" : "📋 Скопировать UUID"}
                 </button>
 
                 <Link href="/settings" className={styles.secondaryButton}>

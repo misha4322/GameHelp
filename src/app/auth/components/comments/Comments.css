@@ -97,6 +97,14 @@
   min-width: 0;
   max-width: 100%;
   flex: 1 1 auto;
+  /* чтобы нативный dropdown не был "белым" на тёмной теме (Chrome/Edge/Win) */
+  color-scheme: dark;
+}
+
+.comments-sort-select option,
+.comments-sort-select optgroup {
+  background-color: var(--card);
+  color: var(--text);
 }
 
 .comments-sort-select:focus {

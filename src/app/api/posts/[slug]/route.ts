@@ -5,6 +5,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { authOptions } from "@/lib/auth-options";
 import { db } from "@/server/db";
 import { postLikes, postTags, posts, users } from "@/server/db/schema";
+import { recordUserPostOpenSignal } from "@/server/recommendation-signals";
 import { checkUserPostingBan } from "@/lib/user-ban";
 import { resolveUserUuid } from "@/lib/user-utils";
 import { applyModerationOrThrow } from "@/server/moderation";
@@ -75,6 +76,14 @@ export async function GET(
     } catch (sessionError) {
       console.error("GET /api/posts/[slug] session warning:", sessionError);
       userId = null;
+    }
+
+    if (userId && countThisView) {
+      try {
+        await recordUserPostOpenSignal(userId, post.id);
+      } catch (recErr) {
+        console.error("GET /api/posts/[slug] rec signal warning:", recErr);
+      }
     }
 
     const likes = await db

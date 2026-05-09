@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { getServerSessionSafe } from "@/lib/safe-session";
 import type { RecommendationsHomeResponse } from "@/types/recommendations";
+import { HOME_FOR_YOU_DEFAULT_LIMIT } from "@/lib/recommendations-display";
 import { getRecommendationsHome } from "@/server/recommendations-service";
 import { HomeHero } from "@/app/home/components/HomeHero";
-import { PostCardsSection } from "@/app/home/components/PostCardsSection";
+import { HomeRecsSection } from "@/app/home/components/HomeRecsSection";
 import { HomeCta } from "@/app/home/components/HomeCta";
 import "./Home.css";
+
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await getServerSessionSafe();
@@ -13,7 +16,7 @@ export default async function Home() {
   let recs: RecommendationsHomeResponse | null = null;
 
   try {
-    recs = await getRecommendationsHome(viewerId, 6);
+    recs = await getRecommendationsHome(viewerId, HOME_FOR_YOU_DEFAULT_LIMIT);
   } catch (e) {
     console.error("Home recommendations failed:", e);
     recs = null;
@@ -24,18 +27,10 @@ export default async function Home() {
       <HomeHero isAuthed={!!session} />
 
       {recs ? (
-        <PostCardsSection
-          title={viewerId ? "Мои рекомендации" : "Популярное сейчас"}
-          kicker={viewerId ? "Персонально" : "Сообщество"}
-          posts={viewerId ? recs.blocks.forYou : recs.blocks.trending}
-          emptyText={
-            viewerId ? "Пока не хватает данных для персональных рекомендаций." : "Пока нет рекомендаций."
-          }
-          linkHref="/posts"
-          linkLabel="Открыть форум →"
-          block={viewerId ? "forYou" : "trending"}
+        <HomeRecsSection
           viewerId={viewerId}
-          cardLayout="poster"
+          initialForYou={recs.blocks.forYou}
+          initialTrending={recs.blocks.trending}
         />
       ) : null}
 

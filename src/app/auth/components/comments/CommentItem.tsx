@@ -457,6 +457,7 @@ export default memo(function CommentItem({
       <CommentReportDialog
         open={reportOpen}
         commentId={comment.id}
+        userId={userId}
         onClose={() => setReportOpen(false)}
         onSubmitted={() => {
           setSuccessMsg("Жалоба отправлена модераторам.");

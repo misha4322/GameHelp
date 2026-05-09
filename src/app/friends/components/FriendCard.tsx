@@ -30,7 +30,7 @@ export default function FriendCard({ friend, onRemove }: Props) {
             {friend.username}
           </Link>
           <div className={styles.userMeta}>
-            <span className={styles.friendIdLabel}>ID:</span>{" "}
+            <span className={styles.friendIdLabel}>UUID:</span>{" "}
             <span className={styles.friendIdValue}>{friend.id}</span>
           </div>
         </div>

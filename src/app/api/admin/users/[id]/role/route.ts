@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, count, eq, ne } from "drizzle-orm";
 import { requireAdminContext, parseAppRole, type AppRole } from "@/lib/admin-server";
-import { isChiefAdmin, ONLY_CHIEF_CAN_MANAGE_ADMIN_ROLES } from "@/server/chief-admin";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 
@@ -53,20 +52,6 @@ export async function PATCH(
         { error: "Сначала назначьте другого админа" },
         { status: 400 }
       );
-    }
-  }
-
-  /** Снять с себя админку может любой админ (если остаётся другой админ — проверка выше). Назначать/снимать у других — только главный. */
-  const selfLeavingAdmin =
-    targetId === c.userId && target.role === "admin" && next !== "admin";
-
-  const touchesAdminCircle =
-    !selfLeavingAdmin && (next === "admin" || target.role === "admin");
-
-  if (touchesAdminCircle) {
-    const actorIsChief = await isChiefAdmin(c.userId);
-    if (!actorIsChief) {
-      return NextResponse.json({ error: ONLY_CHIEF_CAN_MANAGE_ADMIN_ROLES }, { status: 403 });
     }
   }
 

@@ -3,6 +3,7 @@ import type { Session } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth-options";
 import { canManageRoles, canViewAdminPanel, isAdminRole, parseAppRole, type AppRole } from "@/lib/roles";
+import { matchesTempAdminStaff } from "@/lib/temp-admin-bind";
 
 type StaffOk = {
   kind: "ok";
@@ -14,14 +15,7 @@ type StaffOk = {
 type StaffErr = { kind: "response"; res: NextResponse };
 
 export function isTempAdminSession(session: Session) {
-  const bindUserId = process.env.TEMP_ADMIN_USER_ID?.trim();
-  const bindEmail = process.env.TEMP_ADMIN_EMAIL?.trim().toLowerCase();
-  const currentId = session.user?.id?.trim();
-  const currentEmail = session.user?.email?.trim().toLowerCase();
-
-  if (bindUserId && currentId && bindUserId === currentId) return true;
-  if (bindEmail && currentEmail && bindEmail === currentEmail) return true;
-  return false;
+  return matchesTempAdminStaff(session.user?.id, session.user?.email);
 }
 
 export async function getStaffContext(): Promise<StaffOk | StaffErr> {

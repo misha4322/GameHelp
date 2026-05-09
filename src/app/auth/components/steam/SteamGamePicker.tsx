@@ -107,28 +107,30 @@ export default function SteamGamePicker({
 
       {selectedGame ? (
         <div className="selected-game">
-          <div className="selected-game-info">
-            <Image
-              src={selectedGame.capsuleImage}
-              alt={selectedGame.name}
-              width={184}
-              height={69}
-              className="selected-game-image"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-            <div className="selected-game-name">{selectedGame.name}</div>
+          <div className="selected-game-top">
+            <div className="selected-game-thumb">
+              <Image
+                src={selectedGame.capsuleImage}
+                alt=""
+                width={184}
+                height={69}
+                className="selected-game-image"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => onSelect(null)}
+              className="btn-remove"
+              aria-label="Убрать выбранную игру"
+              title="Убрать"
+            >
+              ✕
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onSelect(null)}
-            className="btn-remove"
-            aria-label="Убрать выбранную игру"
-            title="Убрать"
-          >
-            ✕
-          </button>
+          <div className="selected-game-name">{selectedGame.name}</div>
         </div>
       ) : (
         <button type="button" onClick={() => setIsOpen(true)} className="btn-select">
