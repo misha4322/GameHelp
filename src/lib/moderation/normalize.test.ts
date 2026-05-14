@@ -10,7 +10,7 @@ describe("normalizeForModeration", () => {
 
 describe("maskModerationPhrase", () => {
   it("короткая фраза полностью скрыта, длинная — первый и последний символ", () => {
-    expect(maskModerationPhrase("ab")).toBe("***");
-    expect(maskModerationPhrase("слово")).toBe("с***о");
+    expect(maskModerationPhrase("ab")).toBe("...");
+    expect(maskModerationPhrase("слово")).toBe("с...о");
   });
 });

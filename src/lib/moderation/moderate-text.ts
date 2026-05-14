@@ -129,7 +129,7 @@ export function censorText(input: string, matchedRules: ModerationRule[]): strin
     if (rule.action !== "censor") continue;
     const rx = buildLoosePhraseRegex(rule.normalizedPhrase);
     if (!rx) continue;
-    const replacement = rule.replacement?.trim() || "***";
+    const replacement = rule.replacement?.trim() || "...";
     out = out.replace(rx, (full, boundary: string) => `${boundary}${replacement}`);
   }
   return out;

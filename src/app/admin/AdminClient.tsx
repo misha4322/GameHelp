@@ -115,7 +115,7 @@ export function AdminClient({
     "all" | "posts" | "comments" | "messages" | "profile"
   >("all");
   const [wordSeverity, setWordSeverity] = useState<"low" | "medium" | "high">("medium");
-  const [wordReplacement, setWordReplacement] = useState("***");
+  const [wordReplacement, setWordReplacement] = useState("...");
   const [revealedPhraseById, setRevealedPhraseById] = useState<Record<string, string>>({});
   const [wordsShowUncensored, setWordsShowUncensored] = useState(false);
   const [bulkPhrasesRaw, setBulkPhrasesRaw] = useState("");
@@ -376,7 +376,7 @@ export function AdminClient({
     setWordAction("censor");
     setWordScope("all");
     setWordSeverity("medium");
-    setWordReplacement("***");
+    setWordReplacement("...");
   }
 
   async function startEditWord(id: string) {
@@ -395,7 +395,7 @@ export function AdminClient({
       setWordAction(data.word.action);
       setWordScope(data.word.scope);
       setWordSeverity(data.word.severity);
-      setWordReplacement(data.word.replacement ?? "***");
+      setWordReplacement(data.word.replacement ?? "...");
       setWordRevealInput(true);
       setRevealedPhraseById((prev) => ({ ...prev, [id]: data.word!.phrase ?? "" }));
     } catch (e) {
@@ -785,7 +785,7 @@ export function AdminClient({
         <section className="admin-card" id="admin-section-censorship">
           <h2 className="admin-h2">Словарь цензуры</h2>
           <p className="admin-hint">
-            По умолчанию в списке показывается <strong>маска</strong> (первая буква + *** + последняя), чтобы
+            По умолчанию в списке показывается <strong>маска</strong> (первая буква + троеточие + последняя), чтобы
             на демонстрации не отображалась лексика. Показать одну строку можно кнопкой «Показать». Внизу таблицы
             можно включить <strong>показ всех фраз без маски</strong> для всего списка.
           </p>
@@ -847,7 +847,7 @@ export function AdminClient({
             <input
               className="admin-input admin-input-sm"
               type="text"
-              placeholder="Замена (например ***)"
+              placeholder="Замена (например ...)"
               value={wordReplacement}
               onChange={(e) => setWordReplacement(e.target.value)}
               style={{ minWidth: 140 }}

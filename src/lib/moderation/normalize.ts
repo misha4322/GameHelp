@@ -59,9 +59,9 @@ export function normalizeForModeration(input: string): string {
 
 export function maskModerationPhrase(input: string): string {
   const s = String(input ?? "").trim();
-  if (s.length < 4) return "***";
-  const first = s[0] ?? "*";
-  const last = s[s.length - 1] ?? "*";
-  if (!first || !last) return "***";
-  return `${first}***${last}`;
+  if (s.length < 4) return "...";
+  const first = s[0] ?? ".";
+  const last = s[s.length - 1] ?? ".";
+  if (!first || !last) return "...";
+  return `${first}...${last}`;
 }

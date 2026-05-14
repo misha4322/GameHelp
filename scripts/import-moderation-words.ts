@@ -43,7 +43,7 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
   if (!file) {
     return {
       error:
-        "Usage: tsx scripts/import-moderation-words.ts <file.txt> --action censor|block --scope all|posts|... --severity low|medium|high [--replacement ***]",
+        "Usage: tsx scripts/import-moderation-words.ts <file.txt> --action censor|block --scope all|posts|... --severity low|medium|high [--replacement ...]",
     };
   }
 
@@ -72,7 +72,7 @@ function parseArgs(argv: string[]): CliOptions | { error: string } {
     severity = "medium";
   }
 
-  const replacement = flags.get("replacement")?.trim() || "***";
+  const replacement = flags.get("replacement")?.trim() || "...";
 
   return {
     file,

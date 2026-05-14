@@ -400,7 +400,7 @@ export const moderationWords = pgTable("moderation_words", {
     .$type<ModerationSeverity>()
     .notNull()
     .default("medium"),
-  replacement: varchar("replacement", { length: 64 }).notNull().default("***"),
+  replacement: varchar("replacement", { length: 64 }).notNull().default("..."),
   isActive: boolean("is_active").notNull().default(true),
   createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
