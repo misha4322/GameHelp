@@ -16,7 +16,7 @@ import {
 } from "../db/schema";
 import type { CommentReportReasonCategory } from "../db/schema";
 import type { CommentNode } from "../../types/comments";
-import { applyModerationOrThrow, logModerationEvent } from "../moderation";
+import { applyModerationOrThrow, logModerationEvent, moderationBlockedHttpBody } from "../moderation";
 
 const COMMENT_REPORT_CATEGORIES: CommentReportReasonCategory[] = [
   "insult",
@@ -182,11 +182,17 @@ export const commentsRouter = new Elysia()
           targetId: null,
           scope: "comments",
           text: content,
+          blockSourceField: "comment",
         });
         cleanContent = m.cleanText;
         censored = m.result.censored;
         matchedCount = m.result.matchedCount;
       } catch (e) {
+        const blocked = moderationBlockedHttpBody(e);
+        if (blocked) {
+          set.status = 400;
+          return blocked;
+        }
         set.status = 400;
         return { error: e instanceof Error ? e.message : "Комментарий не прошёл модерацию" };
       }
@@ -421,11 +427,17 @@ export const commentsRouter = new Elysia()
           targetId: row.id,
           scope: "comments",
           text: contentRaw,
+          blockSourceField: "comment",
         });
         cleanContent = m.cleanText;
         censored = m.result.censored;
         matchedCount = m.result.matchedCount;
       } catch (e) {
+        const blocked = moderationBlockedHttpBody(e);
+        if (blocked) {
+          set.status = 400;
+          return blocked;
+        }
         set.status = 400;
         return { error: e instanceof Error ? e.message : "Комментарий не прошёл модерацию" };
       }

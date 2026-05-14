@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "../db";
 import { moderationWords, users } from "../db/schema";
@@ -37,6 +37,20 @@ function splitBulkPhrases(raw: string): string[] {
     .split(/[\r\n,;]+/g)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** block → только high; censor → не high (понижаем до medium). */
+function normalizeActionSeverity(
+  action: ModerationAction,
+  severity: ModerationSeverity
+): { action: ModerationAction; severity: ModerationSeverity } {
+  if (action === "block") {
+    return { action: "block", severity: "high" };
+  }
+  if (severity === "high") {
+    return { action: "censor", severity: "medium" };
+  }
+  return { action, severity };
 }
 
 export const moderationWordsRouter = new Elysia({ prefix: "/moderation" })
@@ -149,14 +163,27 @@ export const moderationWordsRouter = new Elysia({ prefix: "/moderation" })
         };
       }
 
+      const { action, severity } = normalizeActionSeverity(body.action, body.severity);
+
+      const dup = await db.query.moderationWords.findFirst({
+        where: and(
+          eq(moderationWords.normalizedPhrase, normalized),
+          eq(moderationWords.scope, body.scope)
+        ),
+        columns: { id: true },
+      });
+      if (dup) {
+        return { success: true, id: dup.id, skippedDuplicate: true as const };
+      }
+
       const inserted = await db
         .insert(moderationWords)
         .values({
           phrase,
           normalizedPhrase: normalized,
-          action: body.action,
+          action,
           scope: body.scope,
-          severity: body.severity,
+          severity,
           replacement: body.replacement?.trim() || "***",
           isActive: body.isActive ?? true,
           createdById: body.userId,
@@ -219,20 +246,23 @@ export const moderationWordsRouter = new Elysia({ prefix: "/moderation" })
       }
 
       const existing = await db.query.moderationWords.findMany({
-        columns: { normalizedPhrase: true },
+        columns: { normalizedPhrase: true, scope: true },
       });
-      const existingSet = new Set(existing.map((r) => r.normalizedPhrase));
+      const existingSet = new Set(existing.map((r) => `${r.normalizedPhrase}\t${r.scope}`));
+
+      const { action, severity } = normalizeActionSeverity(body.action, body.severity);
+      const scopeKey = body.scope;
 
       const toInsert = normalizedList
-        .filter((n) => !existingSet.has(n))
+        .filter((n) => !existingSet.has(`${n}\t${scopeKey}`))
         .map((normalized) => {
           const phrase = uniqueByNormalized.get(normalized)!;
           return {
             phrase,
             normalizedPhrase: normalized,
-            action: body.action,
+            action,
             scope: body.scope,
-            severity: body.severity,
+            severity,
             replacement: body.replacement?.trim() || "***",
             isActive: body.isActive ?? true,
             createdById: body.userId,
@@ -287,15 +317,23 @@ export const moderationWordsRouter = new Elysia({ prefix: "/moderation" })
         set.status = 400;
         return { error: "Фраза не подходит для модерации (после нормализации пусто)" };
       }
+      if (normalized.length < MIN_MODERATION_PHRASE_CHARS) {
+        set.status = 400;
+        return {
+          error: `Минимум ${MIN_MODERATION_PHRASE_CHARS} символа после нормализации (короткие правила дают ложные блокировки текста)`,
+        };
+      }
+
+      const { action, severity } = normalizeActionSeverity(body.action, body.severity);
 
       const updated = await db
         .update(moderationWords)
         .set({
           phrase,
           normalizedPhrase: normalized,
-          action: body.action,
+          action,
           scope: body.scope,
-          severity: body.severity,
+          severity,
           replacement: body.replacement?.trim() || "***",
           isActive: body.isActive,
           updatedById: body.userId,

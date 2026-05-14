@@ -1,10 +1,10 @@
 import { Elysia, t } from "elysia";
 import { db } from "../db";
-import { postLikes, commentLikes } from "../db/schema"; // ОБЯЗАТЕЛЬНО ИМПОРТИРУЙ
+import { postLikes, commentLikes } from "../db/schema"; 
 import { and, eq } from "drizzle-orm";
 
 export const likesRouter = new Elysia({ prefix: "/likes" })
-    /** Совместимость со старым клиентом: только лайк поста без типа */
+
     .post("/toggle", async ({ body }) => {
         const { postId, userId } = body;
 

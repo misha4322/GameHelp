@@ -8,7 +8,7 @@ import { comments, contentReports, posts, users } from "@/server/db/schema";
 
 export const runtime = "nodejs";
 
-/** Контекст разбора одного комментария: существующая жалоба или «прямой» просмотр с поста. */
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ commentId: string }> }

@@ -8,7 +8,7 @@ import { postLikes, postTags, posts, users } from "@/server/db/schema";
 import { recordUserPostOpenSignal } from "@/server/recommendation-signals";
 import { checkUserPostingBan } from "@/lib/user-ban";
 import { resolveUserUuid } from "@/lib/user-utils";
-import { applyModerationOrThrow } from "@/server/moderation";
+import { applyModerationOrThrow, moderationBlockedHttpBody } from "@/server/moderation";
 
 export const runtime = "nodejs";
 
@@ -241,9 +241,14 @@ export async function PATCH(
           targetId: post.id,
           scope: "posts",
           text: title.slice(0, 200),
+          blockSourceField: "title",
         });
         patch.title = mt.cleanText;
       } catch (e) {
+        const blocked = moderationBlockedHttpBody(e);
+        if (blocked) {
+          return NextResponse.json(blocked, { status: 400 });
+        }
         return NextResponse.json(
           { error: e instanceof Error ? e.message : "Заголовок не прошёл модерацию" },
           { status: 400 }
@@ -259,9 +264,14 @@ export async function PATCH(
           targetId: post.id,
           scope: "posts",
           text: raw,
+          blockSourceField: "content",
         });
         patch.content = mc.cleanText;
       } catch (e) {
+        const blocked = moderationBlockedHttpBody(e);
+        if (blocked) {
+          return NextResponse.json(blocked, { status: 400 });
+        }
         return NextResponse.json(
           { error: e instanceof Error ? e.message : "Текст не прошёл модерацию" },
           { status: 400 }

@@ -53,6 +53,13 @@ type ModerationWordRow = {
   updatedAt: string | null;
 };
 
+function moderationSeverityRu(s: string) {
+  if (s === "low") return "Низкая";
+  if (s === "medium") return "Средняя";
+  if (s === "high") return "Высокая";
+  return "—";
+}
+
 export function AdminClient({
   isAdmin,
   canUseDictionaryTabs,
@@ -109,8 +116,8 @@ export function AdminClient({
   >("all");
   const [wordSeverity, setWordSeverity] = useState<"low" | "medium" | "high">("medium");
   const [wordReplacement, setWordReplacement] = useState("***");
-  const [wordIsActive, setWordIsActive] = useState(true);
   const [revealedPhraseById, setRevealedPhraseById] = useState<Record<string, string>>({});
+  const [wordsShowUncensored, setWordsShowUncensored] = useState(false);
   const [bulkPhrasesRaw, setBulkPhrasesRaw] = useState("");
   const [bulkResult, setBulkResult] = useState<string>("");
 
@@ -316,6 +323,7 @@ export function AdminClient({
     setWordsErr("");
     try {
       const sp = new URLSearchParams({ userId: myId });
+      if (wordsShowUncensored) sp.set("reveal", "true");
       const res = await fetch(`/api/moderation/words?${sp}`, { cache: "no-store" });
       const data = (await res.json().catch(() => ({}))) as {
         words?: ModerationWordRow[];
@@ -329,7 +337,7 @@ export function AdminClient({
     } finally {
       setWordsLoading(false);
     }
-  }, [canUseDictionaryTabs, myId]);
+  }, [canUseDictionaryTabs, myId, wordsShowUncensored]);
 
   useEffect(() => {
     if (activeTab !== "censorship") return;
@@ -369,7 +377,6 @@ export function AdminClient({
     setWordScope("all");
     setWordSeverity("medium");
     setWordReplacement("***");
-    setWordIsActive(true);
   }
 
   async function startEditWord(id: string) {
@@ -389,15 +396,8 @@ export function AdminClient({
       setWordScope(data.word.scope);
       setWordSeverity(data.word.severity);
       setWordReplacement(data.word.replacement ?? "***");
-      setWordIsActive(Boolean(data.word.isActive));
       setWordRevealInput(true);
       setRevealedPhraseById((prev) => ({ ...prev, [id]: data.word!.phrase ?? "" }));
-      window.setTimeout(() => {
-        document.getElementById("admin-censorship-form")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 60);
     } catch (e) {
       setWordsErr(e instanceof Error ? e.message : "Ошибка");
     }
@@ -405,6 +405,7 @@ export function AdminClient({
 
   async function toggleRevealPhrase(id: string) {
     if (!canUseDictionaryTabs) return;
+    if (wordsShowUncensored) return;
     if (revealedPhraseById[id]) {
       setRevealedPhraseById((prev) => {
         const next = { ...prev };
@@ -421,6 +422,10 @@ export function AdminClient({
     setSaving("words-form");
     setWordsErr("");
     try {
+      const isActive =
+        wordFormMode === "edit" && wordEditingId
+          ? (words.find((w) => w.id === wordEditingId)?.isActive ?? true)
+          : true;
       const payload = {
         userId: myId,
         phrase: wordPhrase,
@@ -428,7 +433,7 @@ export function AdminClient({
         scope: wordScope,
         severity: wordSeverity,
         replacement: wordReplacement,
-        isActive: wordIsActive,
+        isActive,
       };
 
       const url =
@@ -472,7 +477,7 @@ export function AdminClient({
         scope: wordScope,
         severity: wordSeverity,
         replacement: wordReplacement,
-        isActive: wordIsActive,
+        isActive: true,
       };
       const res = await fetch("/api/moderation/words/bulk", {
         method: "POST",
@@ -781,7 +786,8 @@ export function AdminClient({
           <h2 className="admin-h2">Словарь цензуры</h2>
           <p className="admin-hint">
             По умолчанию в списке показывается <strong>маска</strong> (первая буква + *** + последняя), чтобы
-            на демонстрации не отображалась лексика. Показать полностью можно только вручную.
+            на демонстрации не отображалась лексика. Показать одну строку можно кнопкой «Показать». Внизу таблицы
+            можно включить <strong>показ всех фраз без маски</strong> для всего списка.
           </p>
 
           {wordsErr ? <div className="admin-alert">{wordsErr}</div> : null}
@@ -811,8 +817,8 @@ export function AdminClient({
               value={wordAction}
               onChange={(e) => setWordAction(e.target.value as "censor" | "block")}
             >
-              <option value="censor">Заменить (censor)</option>
-              <option value="block">Запретить (block)</option>
+              <option value="censor">Заменить</option>
+              <option value="block">Блокировать</option>
             </select>
             <select
               className="admin-input admin-input-sm"
@@ -823,20 +829,20 @@ export function AdminClient({
                 )
               }
             >
-              <option value="all">Везде (all)</option>
-              <option value="posts">Посты (posts)</option>
-              <option value="comments">Комментарии (comments)</option>
-              <option value="messages">Сообщения (messages)</option>
-              <option value="profile">Профиль (profile)</option>
+              <option value="all">Везде</option>
+              <option value="posts">Посты</option>
+              <option value="comments">Комментарии</option>
+              <option value="messages">Сообщения</option>
+              <option value="profile">Профиль</option>
             </select>
             <select
               className="admin-input admin-input-sm"
               value={wordSeverity}
               onChange={(e) => setWordSeverity(e.target.value as "low" | "medium" | "high")}
             >
-              <option value="low">Низкий (low)</option>
-              <option value="medium">Средний (medium)</option>
-              <option value="high">Высокий (high)</option>
+              <option value="low">Низкая</option>
+              <option value="medium">Средняя</option>
+              <option value="high">Высокая</option>
             </select>
             <input
               className="admin-input admin-input-sm"
@@ -846,14 +852,6 @@ export function AdminClient({
               onChange={(e) => setWordReplacement(e.target.value)}
               style={{ minWidth: 140 }}
             />
-            <label className="admin-muted" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={wordIsActive}
-                onChange={(e) => setWordIsActive(e.target.checked)}
-              />
-              Активно
-            </label>
 
             <button
               type="button"
@@ -904,75 +902,101 @@ export function AdminClient({
           ) : words.length === 0 ? (
             <p className="admin-muted">Пока нет правил.</p>
           ) : (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Фраза</th>
-                    <th>Действие</th>
-                    <th>Область</th>
-                    <th>Активно</th>
-                    <th>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {words.map((w) => {
-                    const revealed = revealedPhraseById[w.id] || w.phrase || "";
-                    const masked = w.maskedPhrase || maskModerationPhrase(revealed);
-                    return (
-                      <tr key={w.id}>
-                        <td>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                            <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                              {revealed ? revealed : masked}
-                            </span>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => void toggleRevealPhrase(w.id)}
+            <>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Фраза</th>
+                      <th>Действие</th>
+                      <th>Область</th>
+                      <th>Важность</th>
+                      <th>Активно</th>
+                      <th>Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {words.map((w) => {
+                      const manualReveal = revealedPhraseById[w.id];
+                      const masked =
+                        w.maskedPhrase || maskModerationPhrase(w.phrase ?? manualReveal ?? "");
+                      const displayPhrase = wordsShowUncensored
+                        ? (w.phrase ?? masked)
+                        : manualReveal || w.phrase || masked;
+                      const rowRevealed = Boolean(manualReveal || w.phrase);
+                      return (
+                        <tr key={w.id}>
+                          <td>
+                            <div
+                              style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}
                             >
-                              {revealed ? "Скрыть" : "Показать"}
-                            </button>
-                          </div>
-                        </td>
-                        <td>{w.action === "block" ? "Запретить" : "Заменить"}</td>
-                        <td>
-                          {w.scope === "all"
-                            ? "Везде"
-                            : w.scope === "posts"
-                              ? "Посты"
-                              : w.scope === "comments"
-                                ? "Комментарии"
-                                : w.scope === "messages"
-                                  ? "Сообщения"
-                                  : "Профиль"}
-                        </td>
-                        <td>{w.isActive ? "Да" : "Нет"}</td>
-                        <td>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => void startEditWord(w.id)}
-                            >
-                              Редактировать
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-danger btn-sm"
-                              disabled={saving === `words-del-${w.id}`}
-                              onClick={() => void deleteWord(w.id)}
-                            >
-                              {saving === `words-del-${w.id}` ? "…" : "Удалить"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                              <span
+                                style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+                              >
+                                {displayPhrase}
+                              </span>
+                              {!wordsShowUncensored ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => void toggleRevealPhrase(w.id)}
+                                >
+                                  {rowRevealed ? "Скрыть" : "Показать"}
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td>{w.action === "block" ? "Блокировать" : "Заменить"}</td>
+                          <td>
+                            {w.scope === "all"
+                              ? "Везде"
+                              : w.scope === "posts"
+                                ? "Посты"
+                                : w.scope === "comments"
+                                  ? "Комментарии"
+                                  : w.scope === "messages"
+                                    ? "Сообщения"
+                                    : "Профиль"}
+                          </td>
+                          <td>{moderationSeverityRu(w.severity)}</td>
+                          <td>{w.isActive ? "Да" : "Нет"}</td>
+                          <td>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => void startEditWord(w.id)}
+                              >
+                                Редактировать
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm"
+                                disabled={saving === `words-del-${w.id}`}
+                                onClick={() => void deleteWord(w.id)}
+                              >
+                                {saving === `words-del-${w.id}` ? "…" : "Удалить"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <label className="admin-censor-reveal admin-censor-reveal--animated">
+                <input
+                  type="checkbox"
+                  className="admin-censor-reveal-input"
+                  checked={wordsShowUncensored}
+                  onChange={(e) => setWordsShowUncensored(e.target.checked)}
+                />
+                <span className="admin-censor-reveal-switch" aria-hidden />
+                <span className="admin-censor-reveal-label">Показать все фразы без маски</span>
+              </label>
+            </>
           )}
         </section>
       ) : null}

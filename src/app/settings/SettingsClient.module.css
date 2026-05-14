@@ -334,3 +334,34 @@
 .inlineLink:hover {
   color: #f5f3ff;
 }
+
+.textareaBioMirrorShell {
+  position: relative;
+  width: 100%;
+  border: 1px solid rgba(161, 119, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  min-height: 120px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.textareaBioMirrorShell:focus-within {
+  border-color: rgba(167, 139, 250, 0.4);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+}
+
+.textareaBioMirrorShell :global(.moderation-mirror-back-inner).textareaBioMirrorInner,
+.textareaBioMirrorShell :global(.moderation-mirror-ta).textareaBioMirrorInner {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 14px;
+  resize: vertical;
+  margin: 0;
+  color: #fff;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.textareaBioMirrorShell :global(.moderation-mirror-ta).textareaBioMirrorInner {
+  caret-color: #fff;
+}

@@ -285,6 +285,34 @@
   border-color: var(--violet);
 }
 
+.comment-reply-textarea-mirror-shell {
+  width: 100%;
+  min-height: 80px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.comment-reply-textarea-mirror-shell:focus-within {
+  outline: none;
+  border-color: var(--violet);
+}
+
+.comment-reply-textarea-mirror-shell .comment-reply-textarea-mirror-inner,
+.comment-reply-textarea-mirror-shell .moderation-mirror-ta.comment-reply-textarea-mirror-inner {
+  padding: 12px;
+  width: 100%;
+  min-height: 80px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.comment-reply-textarea-mirror-shell .moderation-mirror-ta.comment-reply-textarea-mirror-inner {
+  caret-color: var(--text);
+}
+
 .comment-reply-actions {
   display: flex;
   gap: 12px;

@@ -187,6 +187,39 @@
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
 }
 
+.comments-textarea-mirror-shell {
+  width: 100%;
+  min-height: 120px;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.comments-textarea-mirror-shell:focus-within {
+  border-color: rgba(167, 139, 250, 0.34);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+.comments-textarea-mirror-shell .comments-textarea-mirror-inner,
+.comments-textarea-mirror-shell .moderation-mirror-ta.comments-textarea-mirror-inner {
+  padding: 16px 18px;
+  width: 100%;
+  min-height: 120px;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.comments-textarea-mirror-shell .moderation-mirror-ta.comments-textarea-mirror-inner {
+  caret-color: var(--text);
+}
+
 .comments-ban-notice {
   margin-bottom: 12px;
   padding: 12px 14px;

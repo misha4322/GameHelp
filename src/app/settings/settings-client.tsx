@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, ApiRequestError } from "@/lib/api";
+import ModerationBlockedPreview from "@/components/ModerationBlockedPreview";
+import { ModerationBlockedMirrorTextarea } from "@/components/ModerationBlockedMirrorField";
+import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
 import type { SettingsResponse } from "@/types/settings";
 import styles from "./SettingsClient.module.css";
 
@@ -35,6 +38,11 @@ export default function SettingsClient({ userId }: { userId: string }) {
   const [bannerError, setBannerError] = useState(false);
 
   const [message, setMessage] = useState("");
+  const [profileModBlock, setProfileModBlock] = useState<{
+    field: string;
+    text: string;
+    matches: ModerationTextMatch[];
+  } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const lastSavedPayload = useRef<string>("");
 
@@ -238,6 +246,7 @@ export default function SettingsClient({ userId }: { userId: string }) {
     try {
       if (!silent) {
         setMessage("");
+        setProfileModBlock(null);
       }
 
       await apiRequest(`/users/me`, {
@@ -245,7 +254,23 @@ export default function SettingsClient({ userId }: { userId: string }) {
         body: JSON.stringify(payload),
       });
       lastSavedPayload.current = JSON.stringify(payload);
+      setProfileModBlock(null);
     } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === "MODERATION_BLOCKED" &&
+        error.matches?.length
+      ) {
+        const key = error.sourceField ?? "bio";
+        const raw = (payload as Record<string, unknown>)[key];
+        setProfileModBlock({
+          field: key,
+          text: typeof raw === "string" ? raw : "",
+          matches: error.matches,
+        });
+      } else if (!silent) {
+        setProfileModBlock(null);
+      }
       setMessage(error instanceof Error ? error.message : "Ошибка сохранения");
     }
   }
@@ -536,13 +561,28 @@ export default function SettingsClient({ userId }: { userId: string }) {
 
           <div className={styles.field}>
             <label className={styles.label}>О себе</label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              className={styles.textarea}
-              placeholder="Напиши несколько слов о себе"
-              rows={5}
-            />
+            {profileModBlock?.field === "bio" ? (
+              <ModerationBlockedMirrorTextarea
+                value={bio}
+                onChange={(e) => {
+                  setBio(e.target.value);
+                  setProfileModBlock(null);
+                }}
+                matches={profileModBlock.matches}
+                shellClassName={styles.textareaBioMirrorShell}
+                textareaClassName={styles.textareaBioMirrorInner}
+                placeholder="Напиши несколько слов о себе"
+                rows={5}
+              />
+            ) : (
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                className={styles.textarea}
+                placeholder="Напиши несколько слов о себе"
+                rows={5}
+              />
+            )}
           </div>
 
           <div className={styles.field}>
@@ -557,6 +597,14 @@ export default function SettingsClient({ userId }: { userId: string }) {
           </div>
         </div>
 
+        {profileModBlock && profileModBlock.field !== "bio" ? (
+          <div className={styles.field}>
+            <ModerationBlockedPreview
+              text={profileModBlock.text}
+              matches={profileModBlock.matches}
+            />
+          </div>
+        ) : null}
         {message ? <div className={styles.message}>{message}</div> : null}
       </div>
     </div>

@@ -5,6 +5,9 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import type { CommentNode } from "@/types/comments";
+import { ModerationBlockedMirrorTextarea } from "@/components/ModerationBlockedMirrorField";
+import { readModerationBlockedPayload } from "@/lib/moderation/parse-blocked-response";
+import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
 import { useBanRestriction } from "@/contexts/BanRestrictionContext";
 import { isStaffRole } from "@/lib/roles";
 import ConfirmDialog from "@/app/auth/components/ui/ConfirmDialog";
@@ -42,6 +45,14 @@ export default memo(function CommentItem({
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [repliesOpen, setRepliesOpen] = useState(false);
+  const [modBlockReply, setModBlockReply] = useState<{
+    text: string;
+    matches: ModerationTextMatch[];
+  } | null>(null);
+  const [modBlockEdit, setModBlockEdit] = useState<{
+    text: string;
+    matches: ModerationTextMatch[];
+  } | null>(null);
   const ban = useBanRestriction();
   const commentBlocked = ban.restricted;
 
@@ -125,6 +136,7 @@ export default memo(function CommentItem({
     setSending(true);
     setError("");
     setSuccessMsg("");
+    setModBlockReply(null);
 
     try {
       const res = await fetch(`/api/posts/${encodeURIComponent(postSlug)}/comments`, {
@@ -137,10 +149,16 @@ export default memo(function CommentItem({
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
-        throw new Error(data.error || "Ошибка отправки");
+        const blocked = readModerationBlockedPayload(data);
+        if (blocked) {
+          setModBlockReply({ text: content, matches: blocked.matches });
+        }
+        throw new Error(typeof data.error === "string" ? data.error : "Ошибка отправки");
       }
+
+      setModBlockReply(null);
 
       setReplyText("");
       setIsReplying(false);
@@ -188,6 +206,7 @@ export default memo(function CommentItem({
     }
     setEditSaving(true);
     setError("");
+    setModBlockEdit(null);
     try {
       if (!userId) {
         throw new Error("Сначала войди в аккаунт");
@@ -197,10 +216,16 @@ export default memo(function CommentItem({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, content }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
-        throw new Error(data.error || "Ошибка сохранения");
+        const blocked = readModerationBlockedPayload(data);
+        if (blocked) {
+          setModBlockEdit({ text: content, matches: blocked.matches });
+        }
+        throw new Error(typeof data.error === "string" ? data.error : "Ошибка сохранения");
       }
+
+      setModBlockEdit(null);
       setEditing(false);
       onUpdate();
     } catch (err: unknown) {
@@ -300,13 +325,28 @@ export default memo(function CommentItem({
 
       {editing && isAuthor && !comment.isDeleted ? (
         <div className="comment-edit-box">
-          <textarea
-            className="comment-reply-textarea"
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            rows={3}
-            disabled={editSaving}
-          />
+          {modBlockEdit ? (
+            <ModerationBlockedMirrorTextarea
+              value={editText}
+              onChange={(e) => {
+                setEditText(e.target.value);
+                setModBlockEdit(null);
+              }}
+              matches={modBlockEdit.matches}
+              shellClassName="comment-reply-textarea-mirror-shell"
+              textareaClassName="comment-reply-textarea-mirror-inner"
+              rows={3}
+              disabled={editSaving}
+            />
+          ) : (
+            <textarea
+              className="comment-reply-textarea"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={3}
+              disabled={editSaving}
+            />
+          )}
           <div className="comment-staff-actions">
             <button type="button" className="comment-staff-btn" onClick={() => void saveEdit()} disabled={editSaving}>
               {editSaving ? "…" : "Сохранить"}
@@ -317,6 +357,7 @@ export default memo(function CommentItem({
               onClick={() => {
                 setEditing(false);
                 setEditText(comment.content);
+                setModBlockEdit(null);
               }}
               disabled={editSaving}
             >
@@ -406,16 +447,34 @@ export default memo(function CommentItem({
 
       {isReplying && !comment.isDeleted ? (
         <div className="comment-reply-form">
-          <textarea
-            className="comment-reply-textarea"
-            placeholder="Напишите ответ..."
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            onKeyDown={onReplyKeyDown}
-            rows={2}
-            autoFocus
-            disabled={sending || commentBlocked}
-          />
+          {modBlockReply ? (
+            <ModerationBlockedMirrorTextarea
+              value={replyText}
+              onChange={(e) => {
+                setReplyText(e.target.value);
+                setModBlockReply(null);
+              }}
+              matches={modBlockReply.matches}
+              shellClassName="comment-reply-textarea-mirror-shell"
+              textareaClassName="comment-reply-textarea-mirror-inner"
+              rows={2}
+              autoFocus
+              disabled={sending || commentBlocked}
+              placeholder="Напишите ответ..."
+              onKeyDown={onReplyKeyDown}
+            />
+          ) : (
+            <textarea
+              className="comment-reply-textarea"
+              placeholder="Напишите ответ..."
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              onKeyDown={onReplyKeyDown}
+              rows={2}
+              autoFocus
+              disabled={sending || commentBlocked}
+            />
+          )}
 
           <div className="comment-reply-actions">
             <button

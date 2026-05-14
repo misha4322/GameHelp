@@ -514,6 +514,36 @@
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
+.textareaMirrorShell {
+  width: 100%;
+  min-height: 110px;
+  position: relative;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(161, 119, 255, 0.14);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.textareaMirrorShell:focus-within {
+  border-color: rgba(167, 139, 250, 0.4);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+}
+
+.textareaMirrorShell :global(.moderation-mirror-back-inner).textareaMirrorInner,
+.textareaMirrorShell :global(.moderation-mirror-ta).textareaMirrorInner {
+  width: 100%;
+  min-height: 78px;
+  padding: 16px 16px;
+  margin: 0;
+  color: #fff;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.textareaMirrorShell :global(.moderation-mirror-ta).textareaMirrorInner {
+  caret-color: #fff;
+}
+
 .composerActions {
   display: flex;
   justify-content: flex-end;
@@ -601,6 +631,16 @@
 
   .textarea {
     min-height: 76px;
+    padding: 12px 14px;
+  }
+
+  .textareaMirrorShell {
+    min-height: 76px;
+  }
+
+  .textareaMirrorShell :global(.moderation-mirror-back-inner).textareaMirrorInner,
+  .textareaMirrorShell :global(.moderation-mirror-ta).textareaMirrorInner {
+    min-height: 52px;
     padding: 12px 14px;
   }
 

@@ -4,7 +4,7 @@ import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL } from "d
 import { db } from "../db";
 import { contentReports, friendships, postLikes, postTags, posts } from "../db/schema";
 import { slugify } from "../../lib/slug";
-import { applyModerationOrThrow, logModerationEvent } from "../moderation";
+import { applyModerationOrThrow, logModerationEvent, moderationBlockedHttpBody } from "../moderation";
 import { parseUuidList } from "@/lib/parse-query-ids";
 
 async function makeUniqueSlug(title: string) {
@@ -326,11 +326,12 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
           targetId: null,
           scope: "posts",
           text: title,
+          blockSourceField: "title",
         });
+        titleClean = mt.cleanText;
         if (mt.result.censored) {
           wasCensored = true;
           matchedCount += mt.result.matchedCount;
-          titleClean = mt.cleanText;
         }
 
         const mc = await applyModerationOrThrow({
@@ -339,18 +340,24 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
           targetId: null,
           scope: "posts",
           text: content,
+          blockSourceField: "content",
         });
+        contentClean = mc.cleanText;
         if (mc.result.censored) {
           wasCensored = true;
           matchedCount += mc.result.matchedCount;
-          contentClean = mc.cleanText;
         }
       } catch (e) {
+        const blocked = moderationBlockedHttpBody(e);
+        if (blocked) {
+          set.status = 400;
+          return blocked;
+        }
         set.status = 400;
         return { error: e instanceof Error ? e.message : "Текст не прошёл модерацию" };
       }
 
-      const slug = await makeUniqueSlug(title);
+      const slug = await makeUniqueSlug(titleClean);
 
       const inserted = await db
         .insert(posts)
@@ -551,9 +558,15 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
             targetId: post.id,
             scope: "posts",
             text: title.slice(0, 200),
+            blockSourceField: "title",
           });
           patch.title = mt.cleanText;
         } catch (e) {
+          const blocked = moderationBlockedHttpBody(e);
+          if (blocked) {
+            set.status = 400;
+            return blocked;
+          }
           set.status = 400;
           return { error: e instanceof Error ? e.message : "Заголовок не прошёл модерацию" };
         }
@@ -567,9 +580,15 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
             targetId: post.id,
             scope: "posts",
             text: raw,
+            blockSourceField: "content",
           });
           patch.content = mc.cleanText;
         } catch (e) {
+          const blocked = moderationBlockedHttpBody(e);
+          if (blocked) {
+            set.status = 400;
+            return blocked;
+          }
           set.status = 400;
           return { error: e instanceof Error ? e.message : "Текст не прошёл модерацию" };
         }

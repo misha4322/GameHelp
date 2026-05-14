@@ -7,10 +7,7 @@ import { users } from "@/server/db/schema";
 
 export const runtime = "nodejs";
 
-/**
- * Одноразово: пока в БД нет ни одного `admin`, текущий пользователь становится админом
- * (если передан `Authorization: Bearer <ADMIN_BOOTSTRAP_SECRET>`).
- */
+
 export async function POST(req: NextRequest) {
   const secret = process.env.ADMIN_BOOTSTRAP_SECRET?.trim();
   if (!secret) {

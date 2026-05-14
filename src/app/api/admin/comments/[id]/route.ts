@@ -8,7 +8,7 @@ import { removeReportsForComment } from "@/server/report-queue";
 
 export const runtime = "nodejs";
 
-/** Мягкое удаление (ответы сохраняются) */
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -6,6 +6,8 @@ import { authOptions } from "@/lib/auth-options";
 import { db } from "@/server/db";
 import { comments, friendships, posts, users } from "@/server/db/schema";
 import { favoriteGamesToNameList, normalizeFavoriteGamesPatchValue } from "@/lib/favorite-games";
+import { moderationBlockedHttpBody } from "@/server/moderation";
+import { applyModerationToProfilePatch } from "@/server/profile-moderation";
 import { resolveUserUuid } from "@/lib/user-utils";
 
 export const runtime = "nodejs";
@@ -209,6 +211,16 @@ export async function PATCH(req: Request) {
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+
+  try {
+    await applyModerationToProfilePatch(userId, patch);
+  } catch (e) {
+    const blocked = moderationBlockedHttpBody(e);
+    if (blocked) {
+      return NextResponse.json(blocked, { status: 400 });
+    }
+    throw e;
   }
 
   const updated = await db

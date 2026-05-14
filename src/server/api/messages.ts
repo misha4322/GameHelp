@@ -12,7 +12,7 @@ import {
   posts,
   users,
 } from "../db/schema";
-import { applyModerationOrThrow, logModerationEvent } from "../moderation";
+import { applyModerationOrThrow, logModerationEvent, moderationBlockedHttpBody } from "../moderation";
 
 const MAX_MESSAGE_LEN = 8000;
 const MAX_PINS_PER_CHAT = 30;
@@ -845,11 +845,17 @@ export const messagesRouter = new Elysia({ prefix: "/messages" })
               targetId: null,
               scope: "messages",
               text: content,
+              blockSourceField: "message",
             });
             cleanContent = m.cleanText || null;
             wasCensored = m.result.censored;
             matchedCount = m.result.matchedCount;
           } catch (e) {
+            const blocked = moderationBlockedHttpBody(e);
+            if (blocked) {
+              set.status = 400;
+              return blocked;
+            }
             set.status = 400;
             return { error: e instanceof Error ? e.message : "Сообщение не прошло модерацию" };
           }

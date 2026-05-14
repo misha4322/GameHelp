@@ -3,6 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 
 import type { CommentNode, PostCommentsResponse } from "@/types/comments";
+import { ModerationBlockedMirrorTextarea } from "@/components/ModerationBlockedMirrorField";
+import { readModerationBlockedPayload } from "@/lib/moderation/parse-blocked-response";
+import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
 import { useBanRestriction } from "@/contexts/BanRestrictionContext";
 import { formatBanCountdown } from "@/lib/ban-countdown";
 import { patchCommentReactions } from "@/lib/comment-tree";
@@ -49,6 +52,10 @@ export default function Comments({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [modBlock, setModBlock] = useState<{
+    text: string;
+    matches: ModerationTextMatch[];
+  } | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("new");
   const ban = useBanRestriction();
@@ -110,6 +117,7 @@ export default function Comments({
 
     setSending(true);
     setError("");
+    setModBlock(null);
 
     try {
       const res = await fetch(`/api/posts/${encodeURIComponent(postSlug)}/comments`, {
@@ -123,9 +131,15 @@ export default function Comments({
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Не удалось отправить комментарий");
+        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        const blocked = readModerationBlockedPayload(data);
+        if (blocked) {
+          setModBlock({ text: content, matches: blocked.matches });
+        }
+        throw new Error(typeof data.error === "string" ? data.error : "Не удалось отправить комментарий");
       }
+
+      setModBlock(null);
 
       setText("");
       setListOpen(true);
@@ -239,20 +253,42 @@ export default function Comments({
             {ban.permanent ? "." : ban.bannedUntilMs ? ` ещё ${formatBanCountdown(ban.remainingMs)}.` : "."}
           </div>
         ) : null}
-        <textarea
-          className="comments-textarea"
-          placeholder="Написать комментарий... (Enter — отправить, Shift+Enter — новая строка)"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void addComment();
-            }
-          }}
-          rows={4}
-          disabled={sending || commentBlocked}
-        />
+        {modBlock ? (
+          <ModerationBlockedMirrorTextarea
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setModBlock(null);
+            }}
+            matches={modBlock.matches}
+            shellClassName="comments-textarea-mirror-shell"
+            textareaClassName="comments-textarea-mirror-inner"
+            rows={4}
+            disabled={sending || commentBlocked}
+            placeholder="Написать комментарий... (Enter — отправить, Shift+Enter — новая строка)"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void addComment();
+              }
+            }}
+          />
+        ) : (
+          <textarea
+            className="comments-textarea"
+            placeholder="Написать комментарий... (Enter — отправить, Shift+Enter — новая строка)"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void addComment();
+              }
+            }}
+            rows={4}
+            disabled={sending || commentBlocked}
+          />
+        )}
 
         {error ? <div className="comments-error">{error}</div> : null}
 

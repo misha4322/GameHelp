@@ -125,6 +125,39 @@
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
 }
 
+.postBodyMirrorShell {
+  position: relative;
+  width: 100%;
+  min-height: 300px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-radius: 16px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.postBodyMirrorShell:focus-within {
+  border-color: rgba(167, 139, 250, 0.4);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+.postBodyMirrorShell :global(.moderation-mirror-back-inner).postBodyMirrorInner,
+.postBodyMirrorShell :global(.moderation-mirror-ta).postBodyMirrorInner {
+  width: 100%;
+  min-height: 300px;
+  padding: 14px 16px;
+  line-height: 1.7;
+  color: #fff;
+  font: inherit;
+  resize: vertical;
+  margin: 0;
+}
+
+.postBodyMirrorShell :global(.moderation-mirror-ta).postBodyMirrorInner {
+  caret-color: #fff;
+}
+
 .uploadBlock {
   margin-top: 16px;
   display: flex;
@@ -196,16 +229,22 @@
 
 .tagPicker {
   position: relative;
+  z-index: 0;
+}
+
+.tagPicker:focus-within {
+  z-index: 40;
 }
 
 .tagDropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   left: 0;
   right: 0;
   z-index: 20;
-  max-height: 240px;
+  max-height: min(52vh, 320px);
   overflow: auto;
+  overscroll-behavior: contain;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: #151a34;
@@ -357,6 +396,15 @@
   .richEditor {
     min-height: 240px;
   }
+
+  .postBodyMirrorShell {
+    min-height: 240px;
+  }
+
+  .postBodyMirrorShell :global(.moderation-mirror-back-inner).postBodyMirrorInner,
+  .postBodyMirrorShell :global(.moderation-mirror-ta).postBodyMirrorInner {
+    min-height: 240px;
+  }
 }
 
 @media (max-width: 560px) {
@@ -369,4 +417,36 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+.titleInputMirrorShell {
+  position: relative;
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.titleInputMirrorShell:focus-within {
+  border-color: rgba(167, 139, 250, 0.4);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+.titleInputMirrorShell :global(.moderation-mirror-back-inner).titleInputMirrorInner,
+.titleInputMirrorShell :global(.moderation-mirror-input-el).titleInputMirrorInner {
+  min-height: 48px;
+  padding: 0 14px;
+  line-height: 48px;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+  color: #fff;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.titleInputMirrorShell :global(.moderation-mirror-input-el).titleInputMirrorInner {
+  caret-color: #fff;
 }

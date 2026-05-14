@@ -1,3 +1,5 @@
+import { maskModerationPhrase } from "./normalize";
+
 export type ModerationScope = "all" | "posts" | "comments" | "messages" | "profile";
 export type ModerationAction = "censor" | "block";
 export type ModerationSeverity = "low" | "medium" | "high";
@@ -13,6 +15,19 @@ export type ModerationRule = {
   isActive: boolean;
 };
 
+/** Совпадение в исходном тексте пользователя (индексы в `originalText`). */
+export type ModerationTextMatch = {
+  ruleId: string;
+  phrase: string;
+  maskedPhrase: string;
+  action: ModerationAction;
+  severity: ModerationSeverity;
+  start: number;
+  end: number;
+  /** Фрагмент из текста пользователя */
+  text: string;
+};
+
 export type ModerationResult = {
   originalText: string;
   cleanText: string;
@@ -21,6 +36,7 @@ export type ModerationResult = {
   matchedCount: number;
   action: "none" | "censor" | "block";
   matchedRules: ModerationRule[];
+  matches: ModerationTextMatch[];
 };
 
 /** Фразы короче не используются: иначе ложные block на частицах «и», «а», «у», двух латинских буквах в словах и т.п. */
@@ -34,7 +50,7 @@ function escapeRegex(input: string): string {
  * Текст только для поиска совпадений с правилами: URL, data URI, HTML-теги,
  * markdown-картинки/ссылки — маскируются, чтобы подстроки в путях/атрибутах не давали ложный block.
  */
-function textForModerationMatching(input: string): string {
+export function textForModerationMatching(input: string): string {
   let s = String(input ?? "");
   s = s.replace(/[\u200b-\u200d\uFEFF]/g, "");
   s = s.replace(/data:image\/[^\s)]+/gi, (m) => " ".repeat(m.length));
@@ -51,7 +67,6 @@ function textForModerationMatching(input: string): string {
 
 function charPattern(ch: string): string {
   const c = ch.toLowerCase();
-  // allow latin lookalikes in original input too
   switch (c) {
     case "а":
       return "[аa]";
@@ -82,26 +97,17 @@ function charPattern(ch: string): string {
   }
 }
 
-function buildLoosePhraseRegex(normalizedPhrase: string): RegExp | null {
+export function buildLoosePhraseRegex(normalizedPhrase: string): RegExp | null {
   const norm = String(normalizedPhrase ?? "").trim();
   if (norm.length < MIN_MODERATION_PHRASE_CHARS) return null;
 
   const between = "[\\s\\.,\\-_\\*\\/\\\\]*";
   const parts: string[] = [];
   for (const raw of norm) {
-    // collapse repeated chars in input: allow 1+ repeats for each char
     parts.push(`${charPattern(raw)}+`);
   }
   const inner = parts.join(between);
 
-  /**
-   * ВАЖНО: не матчить подстроки внутри слов.
-   * Иначе короткие правила типа "ass"/"mf"/"die" дают ложные срабатывания.
-   *
-   * \p{L}\p{N} — любые буквы/цифры в unicode.
-   * Слева: начало строки или НЕ буква/цифра.
-   * Справа: следующий символ НЕ буква/цифра или конец строки.
-   */
   const leftBoundary = "(^|[^\\p{L}\\p{N}])";
   const rightBoundary = "(?=[^\\p{L}\\p{N}]|$)";
   const pattern = `${leftBoundary}(${inner})${rightBoundary}`;
@@ -124,7 +130,47 @@ export function censorText(input: string, matchedRules: ModerationRule[]): strin
     const rx = buildLoosePhraseRegex(rule.normalizedPhrase);
     if (!rx) continue;
     const replacement = rule.replacement?.trim() || "***";
-    out = out.replace(rx, (_m, left: string) => `${left}${replacement}`);
+    out = out.replace(rx, (full, boundary: string) => `${boundary}${replacement}`);
+  }
+  return out;
+}
+
+function collectMatchesForRule(
+  originalText: string,
+  matchText: string,
+  rule: ModerationRule
+): ModerationTextMatch[] {
+  const rx = buildLoosePhraseRegex(rule.normalizedPhrase);
+  if (!rx) return [];
+
+  const out: ModerationTextMatch[] = [];
+  rx.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  let n = 0;
+  while ((m = rx.exec(matchText)) !== null) {
+    n++;
+    if (n > 50) break;
+
+    const boundary = m[1] ?? "";
+    const inner = m[2] ?? "";
+    const start = m.index + boundary.length;
+    const end = start + inner.length;
+    if (end > start) {
+      out.push({
+        ruleId: rule.id,
+        phrase: rule.phrase,
+        maskedPhrase: maskModerationPhrase(rule.phrase),
+        action: rule.action,
+        severity: rule.severity,
+        start,
+        end,
+        text: originalText.slice(start, end),
+      });
+    }
+
+    if (m[0].length === 0) {
+      rx.lastIndex++;
+    }
   }
   return out;
 }
@@ -145,31 +191,29 @@ export function moderateText(
   );
 
   const matchedRules: ModerationRule[] = [];
+  const matches: ModerationTextMatch[] = [];
   let matchedCount = 0;
   let hasCensor = false;
   let hasBlock = false;
 
   for (const rule of activeRules) {
-    const rx = buildLoosePhraseRegex(rule.normalizedPhrase);
-    if (!rx) continue;
-
-    let c = 0;
-    rx.lastIndex = 0;
-    while (rx.exec(matchText)) {
-      c++;
-      if (c > 50) break;
-    }
-    if (c <= 0) continue;
+    const ruleMatches = collectMatchesForRule(originalText, matchText, rule);
+    if (ruleMatches.length === 0) continue;
 
     matchedRules.push(rule);
-    matchedCount += c;
+    matchedCount += ruleMatches.length;
+    matches.push(...ruleMatches);
     if (rule.action === "block") hasBlock = true;
     if (rule.action === "censor") hasCensor = true;
   }
 
   const blocked = hasBlock;
   const censored = !blocked && hasCensor;
-  const cleanText = blocked ? originalText : censored ? censorText(originalText, matchedRules) : originalText;
+  const cleanText = blocked
+    ? originalText
+    : censored
+      ? censorText(originalText, matchedRules)
+      : originalText;
 
   const action: ModerationResult["action"] = blocked ? "block" : censored ? "censor" : "none";
 
@@ -181,6 +225,6 @@ export function moderateText(
     matchedCount,
     action,
     matchedRules,
+    matches,
   };
 }
-

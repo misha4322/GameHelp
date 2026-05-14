@@ -8,7 +8,7 @@ import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL } from "d
 import { slugify } from "@/lib/slug";
 import { checkUserPostingBan } from "@/lib/user-ban";
 import { resolveUserUuid } from "@/lib/user-utils";
-import { applyModerationOrThrow, logModerationEvent } from "@/server/moderation";
+import { applyModerationOrThrow, logModerationEvent, moderationBlockedHttpBody } from "@/server/moderation";
 
 export const runtime = "nodejs";
 
@@ -253,11 +253,12 @@ export async function POST(req: Request) {
         targetId: null,
         scope: "posts",
         text: title,
+        blockSourceField: "title",
       });
+      titleClean = mt.cleanText;
       if (mt.result.censored) {
         wasCensored = true;
         matchedCount += mt.result.matchedCount;
-        titleClean = mt.cleanText;
       }
 
       const mc = await applyModerationOrThrow({
@@ -266,20 +267,25 @@ export async function POST(req: Request) {
         targetId: null,
         scope: "posts",
         text: content,
+        blockSourceField: "content",
       });
+      contentClean = mc.cleanText;
       if (mc.result.censored) {
         wasCensored = true;
         matchedCount += mc.result.matchedCount;
-        contentClean = mc.cleanText;
       }
     } catch (e) {
+      const blocked = moderationBlockedHttpBody(e);
+      if (blocked) {
+        return NextResponse.json(blocked, { status: 400 });
+      }
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "Текст не прошёл модерацию" },
         { status: 400 }
       );
     }
 
-    const slug = await makeUniqueSlug(title);
+    const slug = await makeUniqueSlug(titleClean);
 
     const inserted = await db
       .insert(posts)

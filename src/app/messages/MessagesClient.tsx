@@ -14,7 +14,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SimpleBar from "simplebar-react";
 import "simplebar-react/dist/simplebar.min.css";
 
-import { apiRequest } from "@/lib/api";
+import { apiRequest, ApiRequestError } from "@/lib/api";
+import { ModerationBlockedMirrorTextarea } from "@/components/ModerationBlockedMirrorField";
+import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
 import styles from "./MessagesClient.module.css";
 
 const MESSAGE_PAGE = 40;
@@ -182,6 +184,10 @@ export default function MessagesClient({
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [message, setMessage] = useState("");
+  const [modBlock, setModBlock] = useState<{
+    text: string;
+    matches: ModerationTextMatch[];
+  } | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [pendingReply, setPendingReply] = useState<{
@@ -581,6 +587,7 @@ export default function MessagesClient({
 
     setUploadingImage(true);
     setMessage("");
+    setModBlock(null);
 
     try {
       const formData = new FormData();
@@ -596,7 +603,7 @@ export default function MessagesClient({
 
       const replyToId = pendingReply?.id ?? undefined;
       const replySnap = pendingReply?.replyTo ?? null;
-      const result = await apiRequest("/messages/send", {
+      const result = (await apiRequest("/messages/send", {
         method: "POST",
         body: JSON.stringify({
           userId,
@@ -607,7 +614,10 @@ export default function MessagesClient({
           sharedPostId: sharePostId || null,
           ...(replyToId ? { replyToId } : {}),
         }),
-      });
+      })) as {
+        conversationId: string;
+        message?: Parameters<typeof buildMessageFromSendResult>[0];
+      };
 
       const newConversationId = result.conversationId;
       if (result.message?.id) {
@@ -631,6 +641,7 @@ export default function MessagesClient({
 
       setText("");
       setPendingReply(null);
+      setModBlock(null);
       setCurrentConversationId(newConversationId);
 
       const params = new URLSearchParams(searchParams.toString());
@@ -642,7 +653,17 @@ export default function MessagesClient({
       await loadConversations(newConversationId, { silent: true });
       queueMicrotask(() => textareaRef.current?.focus());
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка отправки изображения");
+      if (
+        error instanceof ApiRequestError &&
+        error.code === "MODERATION_BLOCKED" &&
+        error.matches?.length
+      ) {
+        setModBlock({ text: text.trim(), matches: error.matches });
+        setMessage(error.message);
+      } else {
+        setModBlock(null);
+        setMessage(error instanceof Error ? error.message : "Ошибка отправки изображения");
+      }
     } finally {
       setUploadingImage(false);
     }
@@ -663,10 +684,11 @@ export default function MessagesClient({
 
     try {
       setMessage("");
+      setModBlock(null);
 
       const replyToId = pendingReply?.id ?? undefined;
       const replySnap = pendingReply?.replyTo ?? null;
-      const result = await apiRequest("/messages/send", {
+      const result = (await apiRequest("/messages/send", {
         method: "POST",
         body: JSON.stringify({
           userId,
@@ -676,7 +698,10 @@ export default function MessagesClient({
           sharedPostId: sharePostId || null,
           ...(replyToId ? { replyToId } : {}),
         }),
-      });
+      })) as {
+        conversationId: string;
+        message?: Parameters<typeof buildMessageFromSendResult>[0];
+      };
 
       const newConversationId = result.conversationId;
       if (result.message?.id) {
@@ -700,6 +725,7 @@ export default function MessagesClient({
 
       setText("");
       setPendingReply(null);
+      setModBlock(null);
       setCurrentConversationId(newConversationId);
 
       const params = new URLSearchParams(searchParams.toString());
@@ -711,6 +737,16 @@ export default function MessagesClient({
       await loadConversations(newConversationId, { silent: true });
       queueMicrotask(() => textareaRef.current?.focus());
     } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === "MODERATION_BLOCKED" &&
+        error.matches?.length
+      ) {
+        setModBlock({ text: text.trim(), matches: error.matches });
+        setMessage(error.message);
+        return;
+      }
+      setModBlock(null);
       setMessage(error instanceof Error ? error.message : "Ошибка отправки");
     }
   }
@@ -1079,21 +1115,47 @@ export default function MessagesClient({
                   </div>
                 )}
 
-                <textarea
-                  ref={textareaRef}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  enterKeyHint="send"
-                  className={styles.textarea}
-                  rows={3}
-                  placeholder={
-                    sharePostId
-                      ? "Добавь комментарий к пересылаемому посту..."
-                      : "Напиши сообщение..."
-                  }
-                  disabled={uploadingImage}
-                />
+                {modBlock ? (
+                  <ModerationBlockedMirrorTextarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={(e) => {
+                      setText(e.target.value);
+                      setModBlock(null);
+                    }}
+                    matches={modBlock.matches}
+                    shellClassName={styles.textareaMirrorShell}
+                    textareaClassName={styles.textareaMirrorInner}
+                    rows={3}
+                    enterKeyHint="send"
+                    placeholder={
+                      sharePostId
+                        ? "Добавь комментарий к пересылаемому посту..."
+                        : "Напиши сообщение..."
+                    }
+                    disabled={uploadingImage}
+                    onKeyDown={handleKeyDown}
+                  />
+                ) : (
+                  <textarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={(e) => {
+                      setText(e.target.value);
+                      setModBlock(null);
+                    }}
+                    onKeyDown={handleKeyDown}
+                    enterKeyHint="send"
+                    className={styles.textarea}
+                    rows={3}
+                    placeholder={
+                      sharePostId
+                        ? "Добавь комментарий к пересылаемому посту..."
+                        : "Напиши сообщение..."
+                    }
+                    disabled={uploadingImage}
+                  />
+                )}
 
                 <div className={styles.composerActions}>
                   <input

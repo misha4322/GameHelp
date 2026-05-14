@@ -4,9 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import SteamGamePicker from "@/app/auth/components/steam/SteamGamePicker";
+import {
+  ModerationBlockedMirrorInput,
+  ModerationBlockedMirrorTextarea,
+} from "@/components/ModerationBlockedMirrorField";
 import { useBanRestriction } from "@/contexts/BanRestrictionContext";
 import { formatBanCountdown } from "@/lib/ban-countdown";
 import { emitPostRevisionRefresh } from "@/lib/post-revision-refresh";
+import { readModerationBlockedPayload } from "@/lib/moderation/parse-blocked-response";
+import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
 import type { Category, Tag } from "@/types/forum";
 import type { SteamGame } from "@/types/steam";
 
@@ -123,6 +129,7 @@ export default function PostEditor({
   const ban = useBanRestriction();
   const postBlocked = ban.restricted;
   const editorRef = useRef<HTMLDivElement>(null);
+  const wasContentModerationMirrorRef = useRef(false);
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [categoryId] = useState(initialCategoryId);
@@ -136,6 +143,11 @@ export default function PostEditor({
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [error, setError] = useState("");
+  const [modBlockPreview, setModBlockPreview] = useState<{
+    sourceField?: string;
+    text: string;
+    matches: ModerationTextMatch[];
+  } | null>(null);
   const [steamGame, setSteamGame] = useState<SteamGame | null>(null);
 
   const canSubmit = useMemo(() => {
@@ -165,6 +177,15 @@ export default function PostEditor({
     if (!editor) return;
     editor.innerHTML = markdownToEditorHtml(initialContent);
   }, [initialContent]);
+
+  useEffect(() => {
+    const inMirror = modBlockPreview?.sourceField === "content";
+    if (wasContentModerationMirrorRef.current && !inMirror) {
+      const editor = editorRef.current;
+      if (editor) editor.innerHTML = markdownToEditorHtml(content);
+    }
+    wasContentModerationMirrorRef.current = Boolean(inMirror);
+  }, [modBlockPreview, content]);
 
   const effectiveCoverSrc = useMemo(() => {
     if (coverObjectUrl) return coverObjectUrl;
@@ -388,6 +409,7 @@ export default function PostEditor({
     }
 
     setError("");
+    setModBlockPreview(null);
     setIsLoading(true);
 
     try {
@@ -431,8 +453,26 @@ export default function PostEditor({
             coverImage: coverImage ?? null,
           }),
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+          matches?: unknown;
+          post?: { slug?: string };
+        };
+        if (!res.ok) {
+          const blocked = readModerationBlockedPayload(data);
+          if (blocked) {
+            const src = blocked.sourceField;
+            const previewText = src === "title" ? title.trim() : finalContent;
+            setModBlockPreview({
+              sourceField: src === "title" || src === "content" ? src : "content",
+              text: previewText,
+              matches: blocked.matches,
+            });
+          }
+          throw new Error(typeof data.error === "string" ? data.error : "Ошибка сохранения");
+        }
+        setModBlockPreview(null);
         const slug = data?.post?.slug ?? editSlug;
         emitPostRevisionRefresh({ slug });
         router.push(`/posts/${slug}`);
@@ -457,11 +497,28 @@ export default function PostEditor({
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        matches?: unknown;
+        post?: { slug?: string };
+      };
 
       if (!res.ok) {
-        throw new Error(data.error || "Ошибка создания поста");
+        const blocked = readModerationBlockedPayload(data);
+        if (blocked) {
+          const src = blocked.sourceField;
+          const previewText = src === "title" ? title.trim() : finalContent;
+          setModBlockPreview({
+            sourceField: src === "title" || src === "content" ? src : "content",
+            text: previewText,
+            matches: blocked.matches,
+          });
+        }
+        throw new Error(typeof data.error === "string" ? data.error : "Ошибка создания поста");
       }
+
+      setModBlockPreview(null);
 
       if (!data?.post?.slug) {
         throw new Error("Сервер не вернул slug нового поста");
@@ -482,20 +539,25 @@ export default function PostEditor({
   );
 
   const filteredTagOptions = useMemo(() => {
-    const normalized = tagQuery.trim().toLowerCase();
     const pool = availableTags.filter((tag) => !tagIds.includes(tag.id));
-    if (!normalized) return pool.slice(0, 20);
+    const needle = tagQuery.replace(/#/g, "").trim().toLowerCase();
 
-    const byIncludes = pool.filter((tag) =>
-      tag.name.toLowerCase().includes(normalized)
-    );
-
-    if (byIncludes.length > 0) {
-      return byIncludes.slice(0, 20);
+    if (!needle) {
+      return [...pool].sort((a, b) => a.name.localeCompare(b.name, "ru"));
     }
 
-    // Фоллбек: если точного вхождения нет (опечатка), всё равно показываем список.
-    return pool.slice(0, 20);
+    const matches = pool.filter((tag) => tag.name.toLowerCase().includes(needle));
+
+    matches.sort((a, b) => {
+      const an = a.name.toLowerCase();
+      const bn = b.name.toLowerCase();
+      const aStarts = an.startsWith(needle) ? 0 : 1;
+      const bStarts = bn.startsWith(needle) ? 0 : 1;
+      if (aStarts !== bStarts) return aStarts - bStarts;
+      return a.name.localeCompare(b.name, "ru");
+    });
+
+    return matches;
   }, [tagQuery, availableTags, tagIds]);
 
   return (
@@ -518,25 +580,55 @@ export default function PostEditor({
 
             <div className={styles.field}>
               <label className={styles.label}>Заголовок поста</label>
-              <input
-                className={styles.input}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Например: Лучшие настройки для CS2"
-              />
+              {modBlockPreview?.sourceField === "title" ? (
+                <ModerationBlockedMirrorInput
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setModBlockPreview(null);
+                  }}
+                  matches={modBlockPreview.matches}
+                  shellClassName={styles.titleInputMirrorShell}
+                  inputClassName={styles.titleInputMirrorInner}
+                  placeholder="Например: Лучшие настройки для CS2"
+                />
+              ) : (
+                <input
+                  className={styles.input}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Например: Лучшие настройки для CS2"
+                />
+              )}
             </div>
 
             <div className={styles.field}>
               <label className={styles.label}>Текст поста</label>
-              <div
-                ref={editorRef}
-                className={styles.richEditor}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={() => syncMarkdownFromEditor()}
-                onPaste={onPaste}
-                data-placeholder="Опиши тему, вопрос, мнение или гайд. Вставляй картинки и пиши дальше в этом же поле."
-              />
+              {modBlockPreview?.sourceField === "content" ? (
+                <ModerationBlockedMirrorTextarea
+                  wrapClassName=""
+                  value={content}
+                  onChange={(e) => {
+                    setContent(e.target.value);
+                    setModBlockPreview(null);
+                  }}
+                  matches={modBlockPreview.matches}
+                  shellClassName={styles.postBodyMirrorShell}
+                  textareaClassName={styles.postBodyMirrorInner}
+                  rows={14}
+                  placeholder="Опиши тему, вопрос, мнение или гайд. Картинки вставляются кнопкой ниже после исправления текста."
+                />
+              ) : (
+                <div
+                  ref={editorRef}
+                  className={styles.richEditor}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={() => syncMarkdownFromEditor()}
+                  onPaste={onPaste}
+                  data-placeholder="Опиши тему, вопрос, мнение или гайд. Вставляй картинки и пиши дальше в этом же поле."
+                />
+              )}
             </div>
 
             <div className={styles.uploadBlock}>
@@ -548,12 +640,17 @@ export default function PostEditor({
                   multiple
                   className={styles.hiddenInput}
                   onChange={(e) => void uploadImages(e.target.files)}
-                  disabled={uploadingImages}
+                  disabled={uploadingImages || modBlockPreview?.sourceField === "content"}
                 />
               </label>
 
               {uploadingImages ? (
                 <span className={styles.uploadHint}>Загрузка изображений...</span>
+              ) : modBlockPreview?.sourceField === "content" ? (
+                <span className={styles.uploadHint}>
+                  Пока открыто поле исправления блокировки, вставка картинок в текст отключена — исправьте текст, затем
+                  снова появится обычный редактор.
+                </span>
               ) : (
                 <span className={styles.uploadHint}>
                   Вставленные изображения сразу показываются над полем текста. Можно писать дальше.
@@ -596,7 +693,12 @@ export default function PostEditor({
                 />
 
                 {tagPickerOpen ? (
-                  <div className={styles.tagDropdown}>
+                  <div
+                    className={styles.tagDropdown}
+                    onMouseDown={(e) => e.preventDefault()}
+                    role="listbox"
+                    aria-label="Список тегов"
+                  >
                     {filteredTagOptions.length ? (
                       filteredTagOptions.map((tag) => (
                         <button
@@ -613,7 +715,7 @@ export default function PostEditor({
                           #{tag.name}
                         </button>
                       ))
-                    ) : tagQuery.trim() ? (
+                    ) : tagQuery.replace(/#/g, "").trim() ? (
                       <div className={styles.tagDropdownEmpty}>
                         Нет совпадений. Выберите тег из существующего списка.
                       </div>

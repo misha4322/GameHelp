@@ -4,7 +4,9 @@ import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
 import SteamGamePicker from "@/app/auth/components/steam/SteamGamePicker";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, ApiRequestError } from "@/lib/api";
+import ModerationBlockedPreview from "@/components/ModerationBlockedPreview";
+import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
 import {
   parseFavoriteGamesField,
   serializeFavoriteGames,
@@ -32,6 +34,10 @@ export default function FavoriteGamesBlock({
   const [entries, setEntries] = useState<FavoriteGameEntry[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [modBlock, setModBlock] = useState<{
+    text: string;
+    matches: ModerationTextMatch[];
+  } | null>(null);
 
   useEffect(() => {
     setEntries(parseFavoriteGamesField(rawFavoriteGames));
@@ -42,6 +48,7 @@ export default function FavoriteGamesBlock({
       if (!editable) return;
       setSaving(true);
       setErr("");
+      setModBlock(null);
       try {
         const value = next.length ? serializeFavoriteGames(next) : null;
         await apiRequest(`/users/me`, {
@@ -51,6 +58,12 @@ export default function FavoriteGamesBlock({
         setEntries(next);
         onUpdated?.();
       } catch (e) {
+        if (e instanceof ApiRequestError && e.code === "MODERATION_BLOCKED" && e.matches?.length) {
+          const value = next.length ? serializeFavoriteGames(next) : "";
+          setModBlock({ text: value, matches: e.matches });
+        } else {
+          setModBlock(null);
+        }
         setErr(e instanceof Error ? e.message : "Ошибка сохранения");
       } finally {
         setSaving(false);
@@ -78,6 +91,9 @@ export default function FavoriteGamesBlock({
 
   return (
     <div className={`${styles.wrap} ${stretchInColumn ? styles.wrapStretch : ""}`}>
+      {modBlock ? (
+        <ModerationBlockedPreview text={modBlock.text} matches={modBlock.matches} />
+      ) : null}
       {err ? <div className={styles.err}>{err}</div> : null}
 
       {!entries.length && editable ? (

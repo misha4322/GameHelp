@@ -2,6 +2,8 @@ import { Elysia, t } from "elysia";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { favoriteGamesToNameList, normalizeFavoriteGamesPatchValue } from "@/lib/favorite-games";
+import { moderationBlockedHttpBody } from "../moderation";
+import { applyModerationToProfilePatch } from "../profile-moderation";
 
 import { db } from "../db";
 import { comments, friendships, posts, users } from "../db/schema";
@@ -382,6 +384,17 @@ export const usersRouter = new Elysia({ prefix: "/users" })
         if (!Object.keys(patch).length) {
           set.status = 400;
           return { error: "Nothing to update" };
+        }
+
+        try {
+          await applyModerationToProfilePatch(userId, patch);
+        } catch (e) {
+          const blocked = moderationBlockedHttpBody(e);
+          if (blocked) {
+            set.status = 400;
+            return blocked;
+          }
+          throw e;
         }
 
         const updated = await db
