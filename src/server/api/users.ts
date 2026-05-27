@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { favoriteGamesToNameList, normalizeFavoriteGamesPatchValue } from "@/lib/favorite-games";
 import { moderationBlockedHttpBody } from "../moderation";
-import { applyModerationToProfilePatch } from "../profile-moderation";
+import { applyModerationToProfilePatch } from "../moderation/profile";
 
 import { db } from "../db";
 import { comments, friendships, posts, users } from "../db/schema";

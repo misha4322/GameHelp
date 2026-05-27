@@ -4,7 +4,7 @@ import {
   HOME_FOR_YOU_DEFAULT_LIMIT,
   RECOMMENDATIONS_API_MAX_LIMIT,
 } from "@/lib/recommendations-display";
-import { getRecommendationsHome } from "@/server/recommendations-service";
+import { getRecommendationsHome } from "@/server/services/recommendations";
 
 export const runtime = "nodejs";
 

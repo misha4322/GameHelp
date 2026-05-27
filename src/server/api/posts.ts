@@ -4,7 +4,11 @@ import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL } from "d
 import { db } from "../db";
 import { contentReports, friendships, postLikes, postTags, posts } from "../db/schema";
 import { slugify } from "../../lib/slug";
-import { applyModerationOrThrow, logModerationEvent, moderationBlockedHttpBody } from "../moderation";
+import {
+  applyModerationWithLogOrThrow,
+  logModerationEvent,
+  moderationBlockedHttpBody,
+} from "../moderation";
 import { parseUuidList } from "@/lib/parse-query-ids";
 
 async function makeUniqueSlug(title: string) {
@@ -318,9 +322,10 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
       let contentClean = content;
       let matchedCount = 0;
       let wasCensored = false;
+      const changes: unknown[] = [];
 
       try {
-        const mt = await applyModerationOrThrow({
+        const mt = await applyModerationWithLogOrThrow({
           userId: body.userId,
           targetType: "post",
           targetId: null,
@@ -332,9 +337,10 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
         if (mt.result.censored) {
           wasCensored = true;
           matchedCount += mt.result.matchedCount;
+          changes.push({ field: "title", changes: mt.changes });
         }
 
-        const mc = await applyModerationOrThrow({
+        const mc = await applyModerationWithLogOrThrow({
           userId: body.userId,
           targetType: "post",
           targetId: null,
@@ -346,6 +352,7 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
         if (mc.result.censored) {
           wasCensored = true;
           matchedCount += mc.result.matchedCount;
+          changes.push({ field: "content", changes: mc.changes });
         }
       } catch (e) {
         const blocked = moderationBlockedHttpBody(e);
@@ -403,6 +410,9 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
           id: post.id,
           slug: post.slug,
         },
+        moderation: wasCensored
+          ? { matchedCount, fields: changes }
+          : { matchedCount: 0, fields: [] },
       };
     },
     {
@@ -552,7 +562,7 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
           return { error: "Пустой заголовок" };
         }
         try {
-          const mt = await applyModerationOrThrow({
+          const mt = await applyModerationWithLogOrThrow({
             userId: body.userId,
             targetType: "post",
             targetId: post.id,
@@ -574,7 +584,7 @@ export const postsRouter = new Elysia({ prefix: "/posts" })
       if (body.content != null) {
         const raw = String(body.content).trim();
         try {
-          const mc = await applyModerationOrThrow({
+          const mc = await applyModerationWithLogOrThrow({
             userId: body.userId,
             targetType: "post",
             targetId: post.id,

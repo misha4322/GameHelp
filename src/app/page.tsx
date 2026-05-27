@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getServerSessionSafe } from "@/lib/safe-session";
 import type { RecommendationsHomeResponse } from "@/types/recommendations";
 import { HOME_FOR_YOU_DEFAULT_LIMIT } from "@/lib/recommendations-display";
-import { getRecommendationsHome } from "@/server/recommendations-service";
+import { getRecommendationsHome } from "@/server/services/recommendations";
 import { HomeHero } from "@/app/home/components/HomeHero";
 import { HomeRecsSection } from "@/app/home/components/HomeRecsSection";
 import { HomeCta } from "@/app/home/components/HomeCta";

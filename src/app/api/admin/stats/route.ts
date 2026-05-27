@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { count, eq } from "drizzle-orm";
 import { getStaffContext } from "@/lib/admin-server";
-import { resolveChiefAdminUserId } from "@/server/chief-admin";
+import { resolveChiefAdminUserId } from "@/server/admin/chief-admin";
 import { db } from "@/server/db";
 import { users, posts } from "@/server/db/schema";
 

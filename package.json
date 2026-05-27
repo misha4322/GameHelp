@@ -15,7 +15,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "build": "next build",
-    "start": "npm run clean:ports && concurrently -k -n next,api -c blue,magenta \"next start -p 3000\" \"cross-env API_PORT=3001 tsx ./src/server/start.ts\"",
+    "start": "npm run build && npm run clean:ports && concurrently -k -n next,api -c blue,magenta \"next start -p 3000\" \"cross-env API_PORT=3001 tsx ./src/server/start.ts\"",
     "start:web": "next start -p 3000",
     "start:api": "cross-env API_PORT=3001 tsx ./src/server/start.ts",
     "demo": "next build && npm run clean:ports && concurrently -k -n next,api -c blue,magenta \"next start -p 3000\" \"cross-env API_PORT=3001 tsx ./src/server/start.ts\"",

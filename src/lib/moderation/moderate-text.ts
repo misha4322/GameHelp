@@ -42,6 +42,26 @@ export type ModerationResult = {
 /** Фразы короче не используются: иначе ложные block на частицах «и», «а», «у», двух латинских буквах в словах и т.п. */
 export const MIN_MODERATION_PHRASE_CHARS = 3;
 
+const VOWEL_CHARS = new Set(["а", "е", "ё", "и", "о", "у", "ы", "э", "ю", "я"]);
+
+function isModerationVowel(ch: string): boolean {
+  return VOWEL_CHARS.has(ch.toLowerCase().replaceAll("ё", "е"));
+}
+
+/** Пропуск гласных в мате: «блдь» ловится правилом «блядь». Отключить: MODERATION_OPTIONAL_VOWELS=0 */
+export function moderationOptionalVowelsEnabled(): boolean {
+  const raw = String(process.env.MODERATION_OPTIONAL_VOWELS ?? "1").trim().toLowerCase();
+  return raw !== "0" && raw !== "false" && raw !== "off";
+}
+
+/** Пустая строка = удалить фрагмент; «...» — из БД; иначе из MODERATION_CENSOR_FALLBACK (по умолчанию удаление). */
+export function moderationCensorFallback(): string {
+  if (process.env.MODERATION_CENSOR_FALLBACK !== undefined) {
+    return String(process.env.MODERATION_CENSOR_FALLBACK);
+  }
+  return "";
+}
+
 function escapeRegex(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -97,21 +117,41 @@ function charPattern(ch: string): string {
   }
 }
 
-export function buildLoosePhraseRegex(normalizedPhrase: string): RegExp | null {
+export function buildLoosePhraseRegex(
+  normalizedPhrase: string,
+  options?: { optionalVowels?: boolean }
+): RegExp | null {
   const norm = String(normalizedPhrase ?? "").trim();
   if (norm.length < MIN_MODERATION_PHRASE_CHARS) return null;
 
+  const optionalVowels = options?.optionalVowels ?? moderationOptionalVowelsEnabled();
   const between = "[\\s\\.,\\-_\\*\\/\\\\]*";
   const parts: string[] = [];
-  for (const raw of norm) {
-    parts.push(`${charPattern(raw)}+`);
-  }
-  const inner = parts.join(between);
+  // "re:" prefix: advanced rule authored as regex (AI/provider can generate later).
+  // We still wrap it into our boundary groups, so censor/indices logic stays consistent.
+  const inner =
+    norm.startsWith("re:") ?
+      norm.slice(3) :
+      (() => {
+        for (const raw of norm) {
+          const piece = `${charPattern(raw)}+`;
+          if (optionalVowels && isModerationVowel(raw)) {
+            parts.push(`(?:${piece})?`);
+          } else {
+            parts.push(piece);
+          }
+        }
+        return parts.join(between);
+      })();
 
   const leftBoundary = "(^|[^\\p{L}\\p{N}])";
   const rightBoundary = "(?=[^\\p{L}\\p{N}]|$)";
   const pattern = `${leftBoundary}(${inner})${rightBoundary}`;
-  return new RegExp(pattern, "giu");
+  try {
+    return new RegExp(pattern, "giu");
+  } catch {
+    return null;
+  }
 }
 
 export function hasBlockedMatch(
@@ -123,16 +163,35 @@ export function hasBlockedMatch(
   return res.blocked;
 }
 
+function collapseSpacesAfterCensor(input: string): string {
+  return input
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/([(\[])\s+/g, "$1")
+    .replace(/\s+([)\]])/g, "$1");
+}
+
+export function resolveCensorReplacement(rule: ModerationRule): string {
+  const fromRule = rule.replacement;
+  if (fromRule === "..." || fromRule === "***" || fromRule === "…") {
+    return moderationCensorFallback();
+  }
+  if (fromRule != null && String(fromRule).trim() === "") return "";
+  const trimmed = String(fromRule ?? "").trim();
+  if (trimmed) return trimmed;
+  return moderationCensorFallback();
+}
+
 export function censorText(input: string, matchedRules: ModerationRule[]): string {
   let out = input;
   for (const rule of matchedRules) {
     if (rule.action !== "censor") continue;
     const rx = buildLoosePhraseRegex(rule.normalizedPhrase);
     if (!rx) continue;
-    const replacement = rule.replacement?.trim() || "...";
-    out = out.replace(rx, (full, boundary: string) => `${boundary}${replacement}`);
+    const replacement = resolveCensorReplacement(rule);
+    out = out.replace(rx, (_full, boundary: string) => `${boundary}${replacement}`);
   }
-  return out;
+  return collapseSpacesAfterCensor(out);
 }
 
 function collectMatchesForRule(

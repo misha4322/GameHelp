@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNotNull, sql, or } from "drizzle-orm";
 import { db } from "@/server/db";
 import { comments, friendships, messages, postLikes, posts } from "@/server/db/schema";
 import { RECOMMENDATIONS_API_MAX_LIMIT } from "@/lib/recommendations-display";
-import { loadRecSignalsForViewer, recentConsumptionPenalty } from "@/server/recommendation-signals";
+import { loadRecSignalsForViewer, recentConsumptionPenalty } from "./recommendation-signals";
 import type { RecommendationsHomeResponse } from "@/types/recommendations";
 
 type ReasonCode =

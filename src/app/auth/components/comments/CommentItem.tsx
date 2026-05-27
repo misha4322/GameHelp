@@ -8,6 +8,7 @@ import type { CommentNode } from "@/types/comments";
 import { ModerationBlockedMirrorTextarea } from "@/components/ModerationBlockedMirrorField";
 import { readModerationBlockedPayload } from "@/lib/moderation/parse-blocked-response";
 import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
+import { requestModerationPreview } from "@/lib/moderation/preview-api";
 import { useBanRestriction } from "@/contexts/BanRestrictionContext";
 import { isStaffRole } from "@/lib/roles";
 import ConfirmDialog from "@/app/auth/components/ui/ConfirmDialog";
@@ -53,6 +54,10 @@ export default memo(function CommentItem({
     text: string;
     matches: ModerationTextMatch[];
   } | null>(null);
+  const [aiReviewReplyReady, setAiReviewReplyReady] = useState(false);
+  const [aiReviewEditReady, setAiReviewEditReady] = useState(false);
+  const [aiCheckingReply, setAiCheckingReply] = useState(false);
+  const [aiCheckingEdit, setAiCheckingEdit] = useState(false);
   const ban = useBanRestriction();
   const commentBlocked = ban.restricted;
 
@@ -113,6 +118,32 @@ export default memo(function CommentItem({
     [comment.createdAt]
   );
 
+  async function postReply(contentToSend: string) {
+    const res = await fetch(`/api/posts/${encodeURIComponent(postSlug)}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        content: contentToSend,
+        parentId: comment.id,
+      }),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      const blocked = readModerationBlockedPayload(data);
+      if (blocked) {
+        setModBlockReply({ text: contentToSend, matches: blocked.matches });
+      }
+      throw new Error(typeof data.error === "string" ? data.error : "Ошибка отправки");
+    }
+
+    setModBlockReply(null);
+    setReplyText("");
+    setIsReplying(false);
+    onUpdate();
+  }
+
   async function submitReply() {
     const content = replyText.trim();
 
@@ -133,40 +164,50 @@ export default memo(function CommentItem({
       return;
     }
 
-    setSending(true);
     setError("");
     setSuccessMsg("");
     setModBlockReply(null);
 
-    try {
-      const res = await fetch(`/api/posts/${encodeURIComponent(postSlug)}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          content,
-          parentId: comment.id,
-        }),
-      });
+    if (aiReviewReplyReady) {
+      setSending(true);
+      try {
+        await postReply(content);
+        setAiReviewReplyReady(false);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Ошибка сети");
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
 
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (!res.ok) {
-        const blocked = readModerationBlockedPayload(data);
-        if (blocked) {
-          setModBlockReply({ text: content, matches: blocked.matches });
-        }
-        throw new Error(typeof data.error === "string" ? data.error : "Ошибка отправки");
+    setSending(true);
+    setAiCheckingReply(true);
+    try {
+      const preview = await requestModerationPreview({
+        text: content,
+        scope: "comments",
+        userId,
+        sourceField: "comment",
+      });
+      if (preview.blocked) {
+        setModBlockReply({ text: content, matches: preview.matches });
+        setError("Текст содержит запрещённые выражения. Исправьте подчёркнутые слова.");
+        return;
+      }
+      if (preview.needsConfirm && preview.cleanText !== content) {
+        setReplyText(preview.cleanText);
+        setAiReviewReplyReady(true);
+        setSuccessMsg("Текст исправлен в поле — проверьте и отправьте ещё раз.");
+        return;
       }
 
-      setModBlockReply(null);
-
-      setReplyText("");
-      setIsReplying(false);
-      onUpdate();
+      await postReply(content);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Ошибка сети");
     } finally {
       setSending(false);
+      setAiCheckingReply(false);
     }
   }
 
@@ -197,6 +238,26 @@ export default memo(function CommentItem({
     }
   }
 
+  async function patchComment(contentToSend: string) {
+    const res = await fetch(`/api/comments/${encodeURIComponent(comment.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, content: contentToSend }),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      const blocked = readModerationBlockedPayload(data);
+      if (blocked) {
+        setModBlockEdit({ text: contentToSend, matches: blocked.matches });
+      }
+      throw new Error(typeof data.error === "string" ? data.error : "Ошибка сохранения");
+    }
+
+    setModBlockEdit(null);
+    setEditing(false);
+    onUpdate();
+  }
+
   async function saveEdit() {
     const content = editText.trim();
     if (!content) return;
@@ -204,34 +265,54 @@ export default memo(function CommentItem({
       setError("Сейчас нельзя редактировать комментарии.");
       return;
     }
-    setEditSaving(true);
     setError("");
     setModBlockEdit(null);
+
+    if (aiReviewEditReady) {
+      setEditSaving(true);
+      try {
+        if (!userId) throw new Error("Сначала войди в аккаунт");
+        await patchComment(content);
+        setAiReviewEditReady(false);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Ошибка");
+      } finally {
+        setEditSaving(false);
+      }
+      return;
+    }
+
+    setEditSaving(true);
+    setAiCheckingEdit(true);
     try {
       if (!userId) {
         throw new Error("Сначала войди в аккаунт");
       }
-      const res = await fetch(`/api/comments/${encodeURIComponent(comment.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, content }),
+
+      const preview = await requestModerationPreview({
+        text: content,
+        scope: "comments",
+        userId,
+        sourceField: "comment",
       });
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (!res.ok) {
-        const blocked = readModerationBlockedPayload(data);
-        if (blocked) {
-          setModBlockEdit({ text: content, matches: blocked.matches });
-        }
-        throw new Error(typeof data.error === "string" ? data.error : "Ошибка сохранения");
+      if (preview.blocked) {
+        setModBlockEdit({ text: content, matches: preview.matches });
+        setError("Текст содержит запрещённые выражения. Исправьте подчёркнутые слова.");
+        return;
+      }
+      if (preview.needsConfirm && preview.cleanText !== content) {
+        setEditText(preview.cleanText);
+        setAiReviewEditReady(true);
+        setSuccessMsg("Текст исправлен — проверьте и сохраните ещё раз.");
+        return;
       }
 
-      setModBlockEdit(null);
-      setEditing(false);
-      onUpdate();
+      await patchComment(content);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
       setEditSaving(false);
+      setAiCheckingEdit(false);
     }
   }
 
@@ -550,6 +631,7 @@ export default memo(function CommentItem({
           </div>
         </>
       ) : null}
+
     </div>
   );
 });

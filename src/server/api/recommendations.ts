@@ -4,7 +4,7 @@ import {
   HOME_FOR_YOU_DEFAULT_LIMIT,
   RECOMMENDATIONS_API_MAX_LIMIT,
 } from "@/lib/recommendations-display";
-import { getRecommendationsHome } from "../recommendations-service";
+import { getRecommendationsHome } from "../services/recommendations";
 
 export const recommendationsRouter = new Elysia({ prefix: "/recommendations" })
   .get(

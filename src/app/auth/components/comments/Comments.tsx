@@ -6,6 +6,7 @@ import type { CommentNode, PostCommentsResponse } from "@/types/comments";
 import { ModerationBlockedMirrorTextarea } from "@/components/ModerationBlockedMirrorField";
 import { readModerationBlockedPayload } from "@/lib/moderation/parse-blocked-response";
 import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
+import { requestModerationPreview } from "@/lib/moderation/preview-api";
 import { useBanRestriction } from "@/contexts/BanRestrictionContext";
 import { formatBanCountdown } from "@/lib/ban-countdown";
 import { patchCommentReactions } from "@/lib/comment-tree";
@@ -31,7 +32,6 @@ function formatCompactCount(n: number): string {
   if (value < 1000) return String(value);
   const k = value / 1000;
   const rounded = k < 10 ? Math.round(k * 10) / 10 : Math.round(k);
-  // русская запятая
   const s = String(rounded).replace(".", ",");
   return `${s}K`;
 }
@@ -51,7 +51,10 @@ export default function Comments({
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [aiChecking, setAiChecking] = useState(false);
+  const [aiReviewReady, setAiReviewReady] = useState(false);
   const [error, setError] = useState("");
+  const [aiNotice, setAiNotice] = useState("");
   const [modBlock, setModBlock] = useState<{
     text: string;
     matches: ModerationTextMatch[];
@@ -93,6 +96,33 @@ export default function Comments({
     void loadComments();
   }, [loadComments, userId]);
 
+  async function postComment(contentToSend: string, parentId: string | null) {
+    const res = await fetch(`/api/posts/${encodeURIComponent(postSlug)}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        content: contentToSend,
+        parentId,
+      }),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      const blocked = readModerationBlockedPayload(data);
+      if (blocked) {
+        setModBlock({ text: contentToSend, matches: blocked.matches });
+      }
+      throw new Error(typeof data.error === "string" ? data.error : "Не удалось отправить комментарий");
+    }
+
+    setModBlock(null);
+    setText("");
+    setAiReviewReady(false);
+    setListOpen(true);
+    await loadComments();
+  }
+
   async function addComment(parentId: string | null = null) {
     const content = text.trim();
 
@@ -115,39 +145,56 @@ export default function Comments({
       return;
     }
 
-    setSending(true);
     setError("");
     setModBlock(null);
 
-    try {
-      const res = await fetch(`/api/posts/${encodeURIComponent(postSlug)}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          content,
-          parentId,
-        }),
-      });
+    if (aiReviewReady) {
+      setSending(true);
+      try {
+        await postComment(content, parentId);
+        setAiNotice("");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Ошибка отправки комментария");
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
 
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-        const blocked = readModerationBlockedPayload(data);
-        if (blocked) {
-          setModBlock({ text: content, matches: blocked.matches });
-        }
-        throw new Error(typeof data.error === "string" ? data.error : "Не удалось отправить комментарий");
+    setSending(true);
+    setAiChecking(true);
+    setAiNotice("");
+
+    try {
+      const preview = await requestModerationPreview({
+        text: content,
+        scope: "comments",
+        userId,
+        sourceField: "comment",
+      });
+      if (preview.blocked) {
+        setModBlock({ text: content, matches: preview.matches });
+        setError("Текст содержит запрещённые выражения. Исправьте подчёркнутые слова.");
+        return;
       }
 
-      setModBlock(null);
+      if (preview.needsConfirm && preview.cleanText !== content) {
+        setText(preview.cleanText);
+        setAiReviewReady(true);
+        setAiNotice(
+          preview.aiModerationStatus === "failed"
+            ? "ИИ не ответил — проверьте Gemini API. Текст можно править вручную, затем «Отправить»."
+            : "Модерация применена в поле выше. Проверьте и нажмите «Отправить»."
+        );
+        return;
+      }
 
-      setText("");
-      setListOpen(true);
-      await loadComments();
+      await postComment(content, parentId);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Ошибка отправки комментария");
     } finally {
       setSending(false);
+      setAiChecking(false);
     }
   }
 
@@ -186,16 +233,12 @@ export default function Comments({
           typeof data.likedByMe === "boolean" &&
           typeof data.dislikedByMe === "boolean"
         ) {
-          const likeCount = data.likeCount;
-          const dislikeCount = data.dislikeCount;
-          const likedByMe = data.likedByMe;
-          const dislikedByMe = data.dislikedByMe;
           setComments((prev) =>
             patchCommentReactions(prev, commentId, {
-              likeCount,
-              dislikeCount,
-              likedByMe,
-              dislikedByMe,
+              likeCount: data.likeCount!,
+              dislikeCount: data.dislikeCount!,
+              likedByMe: data.likedByMe!,
+              dislikedByMe: data.dislikedByMe!,
             })
           );
         } else {
@@ -234,7 +277,6 @@ export default function Comments({
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return tb - ta;
     }
-    // new
     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
     const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return tb - ta;
@@ -253,18 +295,29 @@ export default function Comments({
             {ban.permanent ? "." : ban.bannedUntilMs ? ` ещё ${formatBanCountdown(ban.remainingMs)}.` : "."}
           </div>
         ) : null}
+        {aiChecking ? (
+          <div className="comments-ai-checking" role="status">
+            ИИ модерирует текст по правилам…
+          </div>
+        ) : null}
+        {aiReviewReady && aiNotice ? (
+          <div className="comments-ai-notice" role="status">
+            {aiNotice}
+          </div>
+        ) : null}
         {modBlock ? (
           <ModerationBlockedMirrorTextarea
             value={text}
             onChange={(e) => {
               setText(e.target.value);
               setModBlock(null);
+              setAiReviewReady(false);
             }}
             matches={modBlock.matches}
             shellClassName="comments-textarea-mirror-shell"
             textareaClassName="comments-textarea-mirror-inner"
             rows={4}
-            disabled={sending || commentBlocked}
+            disabled={sending || commentBlocked || aiChecking}
             placeholder="Написать комментарий... (Enter — отправить, Shift+Enter — новая строка)"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -275,10 +328,13 @@ export default function Comments({
           />
         ) : (
           <textarea
-            className="comments-textarea"
+            className={`comments-textarea${aiReviewReady ? " comments-textarea-ai-ready" : ""}`}
             placeholder="Написать комментарий... (Enter — отправить, Shift+Enter — новая строка)"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              setAiReviewReady(false);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -286,7 +342,7 @@ export default function Comments({
               }
             }}
             rows={4}
-            disabled={sending || commentBlocked}
+            disabled={sending || commentBlocked || aiChecking}
           />
         )}
 
@@ -296,9 +352,9 @@ export default function Comments({
           <button
             className="comments-submit-button"
             onClick={() => void addComment()}
-            disabled={sending || !text.trim() || commentBlocked}
+            disabled={sending || !text.trim() || commentBlocked || aiChecking}
           >
-            {sending ? "Отправка..." : "Отправить"}
+            {aiChecking ? "ИИ проверяет…" : sending ? "Отправка..." : aiReviewReady ? "Отправить" : "Проверить и отправить"}
           </button>
         </div>
       </div>

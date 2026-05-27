@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { getStaffContext } from "@/lib/admin-server";
 import { db } from "@/server/db";
 import { comments } from "@/server/db/schema";
-import { removeReportsForComment } from "@/server/report-queue";
+import { removeReportsForComment } from "@/server/services/report-queue";
 
 export const runtime = "nodejs";
 

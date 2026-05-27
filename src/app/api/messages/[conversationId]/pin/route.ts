@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth-options";
 import { resolveUserUuid } from "@/lib/user-utils";
-import { pinMessage } from "@/server/messages-service";
+import { pinMessage } from "@/server/services/messages";
 
 export const runtime = "nodejs";
 

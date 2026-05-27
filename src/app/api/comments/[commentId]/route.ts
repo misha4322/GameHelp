@@ -7,6 +7,7 @@ import { checkUserPostingBan } from "@/lib/user-ban";
 import { db } from "@/server/db";
 import { comments, users } from "@/server/db/schema";
 import { resolveUserUuid } from "@/lib/user-utils";
+import { applyModerationWithLogOrThrow, logModerationEvent, moderationBlockedHttpBody } from "@/server/moderation";
 
 export const runtime = "nodejs";
 
@@ -70,16 +71,58 @@ export async function PATCH(
       return NextResponse.json({ error: "Нельзя редактировать удалённый комментарий" }, { status: 400 });
     }
 
+    let cleanContent = content.slice(0, MAX_COMMENT_LEN);
+    let wasCensored = false;
+    let matchedCount = 0;
+    let changes: unknown[] = [];
+    try {
+      const m = await applyModerationWithLogOrThrow({
+        userId,
+        targetType: "comment",
+        targetId: row.id,
+        scope: "comments",
+        text: cleanContent,
+        blockSourceField: "comment",
+      });
+      cleanContent = m.cleanText.slice(0, MAX_COMMENT_LEN);
+      wasCensored = m.result.censored;
+      matchedCount = m.result.matchedCount;
+      changes = m.changes;
+    } catch (e) {
+      const blocked = moderationBlockedHttpBody(e);
+      if (blocked) {
+        return NextResponse.json(blocked, { status: 400 });
+      }
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Комментарий не прошёл модерацию" },
+        { status: 400 }
+      );
+    }
+
     await db
       .update(comments)
       .set({
-        content: content.slice(0, MAX_COMMENT_LEN),
+        content: cleanContent,
         editedAt: new Date(),
         editedByStaffId: null,
       })
       .where(and(eq(comments.id, commentId), eq(comments.authorId, userId)));
 
-    return NextResponse.json({ ok: true });
+    if (wasCensored) {
+      await logModerationEvent({
+        userId,
+        targetType: "comment",
+        targetId: row.id,
+        action: "censor",
+        scope: "comments",
+        matchedCount,
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      moderation: wasCensored ? { matchedCount, changes } : { matchedCount: 0, changes: [] },
+    });
   } catch (e) {
     console.error("PATCH /api/comments/[commentId]", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

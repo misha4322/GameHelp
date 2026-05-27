@@ -8,6 +8,7 @@ import { isStaffRole } from "@/lib/roles";
 import { checkUserPostingBan } from "@/lib/user-ban";
 import { resolveUserUuid } from "@/lib/user-utils";
 import type { CommentNode } from "@/types/comments";
+import { applyModerationWithLogOrThrow, logModerationEvent, moderationBlockedHttpBody } from "@/server/moderation";
 
 export const runtime = "nodejs";
 
@@ -229,6 +230,34 @@ export async function POST(
       return NextResponse.json({ error: "Пустой комментарий" }, { status: 400 });
     }
 
+    let cleanContent = content;
+    let wasCensored = false;
+    let matchedCount = 0;
+    let changes: unknown[] = [];
+    try {
+      const m = await applyModerationWithLogOrThrow({
+        userId,
+        targetType: "comment",
+        targetId: null,
+        scope: "comments",
+        text: content,
+        blockSourceField: "comment",
+      });
+      cleanContent = m.cleanText;
+      wasCensored = m.result.censored;
+      matchedCount = m.result.matchedCount;
+      changes = m.changes;
+    } catch (e) {
+      const blocked = moderationBlockedHttpBody(e);
+      if (blocked) {
+        return NextResponse.json(blocked, { status: 400 });
+      }
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Комментарий не прошёл модерацию" },
+        { status: 400 }
+      );
+    }
+
     // проверка parentId (если это ответ)
     if (parentId) {
       const parent = await db.query.comments.findFirst({
@@ -249,12 +278,28 @@ export async function POST(
       .values({
         postId: post.id,
         authorId: userId,
-        content,
+        content: cleanContent,
         parentId,
       })
       .returning();
 
-    return NextResponse.json({ success: true, comment: inserted[0] });
+    const row = inserted[0];
+    if (wasCensored && row?.id) {
+      await logModerationEvent({
+        userId,
+        targetType: "comment",
+        targetId: row.id,
+        action: "censor",
+        scope: "comments",
+        matchedCount,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      comment: row,
+      moderation: wasCensored ? { matchedCount, changes } : { matchedCount: 0, changes: [] },
+    });
   } catch (e) {
     console.error("POST /api/posts/[slug]/comments error:", e);
     return NextResponse.json(

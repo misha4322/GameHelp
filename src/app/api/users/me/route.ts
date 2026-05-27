@@ -6,8 +6,7 @@ import { authOptions } from "@/lib/auth-options";
 import { db } from "@/server/db";
 import { comments, friendships, posts, users } from "@/server/db/schema";
 import { favoriteGamesToNameList, normalizeFavoriteGamesPatchValue } from "@/lib/favorite-games";
-import { moderationBlockedHttpBody } from "@/server/moderation";
-import { applyModerationToProfilePatch } from "@/server/profile-moderation";
+import { applyModerationToProfilePatch, moderationBlockedHttpBody } from "@/server/moderation";
 import { resolveUserUuid } from "@/lib/user-utils";
 
 export const runtime = "nodejs";

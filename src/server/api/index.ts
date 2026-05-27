@@ -11,6 +11,7 @@ import { usersRouter } from "./users";
 import { messagesRouter } from "./messages";
 import { recommendationsRouter } from "./recommendations";
 import { moderationWordsRouter } from "./moderation-words";
+import { moderationGeminiPingRouter, moderationPreviewRouter } from "./moderation-preview";
 
 const allowedOrigins = new Set<string>([
   "http://localhost:3000",
@@ -93,6 +94,8 @@ export const app = new Elysia({
   .use(friendsRouter)
   .use(messagesRouter)
   .use(recommendationsRouter)
-  .use(moderationWordsRouter);
+  .use(moderationWordsRouter)
+  .use(moderationPreviewRouter)
+  .use(moderationGeminiPingRouter);
 
 export type App = typeof app;

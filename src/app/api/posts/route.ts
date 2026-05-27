@@ -8,7 +8,11 @@ import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL } from "d
 import { slugify } from "@/lib/slug";
 import { checkUserPostingBan } from "@/lib/user-ban";
 import { resolveUserUuid } from "@/lib/user-utils";
-import { applyModerationOrThrow, logModerationEvent, moderationBlockedHttpBody } from "@/server/moderation";
+import {
+  applyModerationWithLogOrThrow,
+  logModerationEvent,
+  moderationBlockedHttpBody,
+} from "@/server/moderation";
 
 export const runtime = "nodejs";
 
@@ -245,9 +249,10 @@ export async function POST(req: Request) {
     let contentClean = content;
     let matchedCount = 0;
     let wasCensored = false;
+    const changes: { field: "title" | "content"; changes: unknown[] }[] = [];
 
     try {
-      const mt = await applyModerationOrThrow({
+      const mt = await applyModerationWithLogOrThrow({
         userId,
         targetType: "post",
         targetId: null,
@@ -260,8 +265,9 @@ export async function POST(req: Request) {
         wasCensored = true;
         matchedCount += mt.result.matchedCount;
       }
+      if (mt.changes.length) changes.push({ field: "title", changes: mt.changes });
 
-      const mc = await applyModerationOrThrow({
+      const mc = await applyModerationWithLogOrThrow({
         userId,
         targetType: "post",
         targetId: null,
@@ -274,6 +280,7 @@ export async function POST(req: Request) {
         wasCensored = true;
         matchedCount += mc.result.matchedCount;
       }
+      if (mc.changes.length) changes.push({ field: "content", changes: mc.changes });
     } catch (e) {
       const blocked = moderationBlockedHttpBody(e);
       if (blocked) {
@@ -322,7 +329,16 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, post: { id: post.id, slug: post.slug } });
+    return NextResponse.json({
+      success: true,
+      post: { id: post.id, slug: post.slug },
+      moderation: wasCensored ?
+        {
+          matchedCount,
+          fields: changes,
+        }
+      : { matchedCount: 0, fields: [] },
+    });
   } catch (e) {
     console.error("POST /api/posts error:", e);
     return NextResponse.json(

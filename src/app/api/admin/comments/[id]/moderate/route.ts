@@ -7,7 +7,7 @@ import { BAN_IMMUNE_MESSAGE, isBanImmuneRole } from "@/lib/roles";
 import { banDurationToMs, isBanDurationKey, type BanDurationKey } from "@/lib/ban-durations";
 import { db } from "@/server/db";
 import { comments, userWarnings, users } from "@/server/db/schema";
-import { removeReportsForComment } from "@/server/report-queue";
+import { removeReportsForComment } from "@/server/services/report-queue";
 
 export const runtime = "nodejs";
 

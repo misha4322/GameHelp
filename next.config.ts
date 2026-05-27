@@ -44,7 +44,8 @@ const nextConfig = {
   allowedDevOrigins: parseAllowedDevOrigins(),
 
   async rewrites() {
-    return [
+    return {
+      afterFiles: [
       {
         source: "/api/health",
         destination: "http://127.0.0.1:3001/api/health",
@@ -66,9 +67,10 @@ const nextConfig = {
         source: "/api/messages/:path*",
         destination: "http://127.0.0.1:3001/api/messages/:path*",
       },
+      /** /api/moderation/preview — Next route (долгий ИИ), остальное moderation — Elysia */
       {
-        source: "/api/moderation/:path*",
-        destination: "http://127.0.0.1:3001/api/moderation/:path*",
+        source: "/api/moderation/words/:path*",
+        destination: "http://127.0.0.1:3001/api/moderation/words/:path*",
       },
       {
         source: "/api/forum/:path*",
@@ -78,7 +80,8 @@ const nextConfig = {
         source: "/api/likes/:path*",
         destination: "http://127.0.0.1:3001/api/likes/:path*",
       },
-    ];
+      ],
+    };
   },
 
   images: {

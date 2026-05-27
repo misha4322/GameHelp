@@ -3,6 +3,7 @@ import type { SteamGameBase } from "../../types/steam";
 
 let gamesCache: SteamGameBase[] | null = null;
 let cacheTime = 0;
+let gamesLoadInFlight: Promise<SteamGameBase[]> | null = null;
 
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
@@ -29,13 +30,8 @@ async function fetchSteamGamesLegacy() {
   }
 }
 
-async function fetchSteamGames() {
+async function loadSteamGamesFromNetwork(): Promise<SteamGameBase[]> {
   const now = Date.now();
-
-  if (gamesCache && now - cacheTime < CACHE_DURATION) {
-    return gamesCache;
-  }
-
   const steamKey = process.env.STEAM_SECRET;
 
   if (!steamKey) {
@@ -71,7 +67,7 @@ async function fetchSteamGames() {
 
     cacheTime = now;
 
-    return gamesCache;
+    return gamesCache ?? [];
   } catch (error) {
     console.error("Steam API error:", error);
 
@@ -81,6 +77,24 @@ async function fetchSteamGames() {
 
     return await fetchSteamGamesLegacy();
   }
+}
+
+async function fetchSteamGames() {
+  const now = Date.now();
+
+  if (gamesCache && now - cacheTime < CACHE_DURATION) {
+    return gamesCache;
+  }
+
+  if (gamesLoadInFlight) {
+    return gamesLoadInFlight;
+  }
+
+  gamesLoadInFlight = loadSteamGamesFromNetwork().finally(() => {
+    gamesLoadInFlight = null;
+  });
+
+  return gamesLoadInFlight;
 }
 
 export const steamRouter = new Elysia({ prefix: "/steam" }).get(

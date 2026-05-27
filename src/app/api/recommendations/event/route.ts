@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth-options";
-import { recordUserPostRecSignal } from "@/server/recommendation-signals";
+import { recordUserPostRecSignal } from "@/server/services/recommendation-signals";
 import type { RecommendationBlockName } from "@/types/recommendations";
 
 export const runtime = "nodejs";

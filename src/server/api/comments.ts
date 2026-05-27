@@ -16,7 +16,11 @@ import {
 } from "../db/schema";
 import type { CommentReportReasonCategory } from "../db/schema";
 import type { CommentNode } from "../../types/comments";
-import { applyModerationOrThrow, logModerationEvent, moderationBlockedHttpBody } from "../moderation";
+import {
+  applyModerationWithLogOrThrow,
+  logModerationEvent,
+  moderationBlockedHttpBody,
+} from "../moderation";
 
 const COMMENT_REPORT_CATEGORIES: CommentReportReasonCategory[] = [
   "insult",
@@ -175,8 +179,9 @@ export const commentsRouter = new Elysia()
       let cleanContent = content;
       let matchedCount = 0;
       let censored = false;
+      let changes: unknown[] = [];
       try {
-        const m = await applyModerationOrThrow({
+        const m = await applyModerationWithLogOrThrow({
           userId: body.userId,
           targetType: "comment",
           targetId: null,
@@ -187,6 +192,7 @@ export const commentsRouter = new Elysia()
         cleanContent = m.cleanText;
         censored = m.result.censored;
         matchedCount = m.result.matchedCount;
+        changes = m.changes;
       } catch (e) {
         const blocked = moderationBlockedHttpBody(e);
         if (blocked) {
@@ -244,6 +250,9 @@ export const commentsRouter = new Elysia()
       return {
         success: true,
         comment: row,
+        moderation: censored
+          ? { matchedCount, changes }
+          : { matchedCount: 0, changes: [] },
       };
     },
     {
@@ -420,8 +429,9 @@ export const commentsRouter = new Elysia()
       let cleanContent = contentRaw;
       let matchedCount = 0;
       let censored = false;
+      let changes: unknown[] = [];
       try {
-        const m = await applyModerationOrThrow({
+        const m = await applyModerationWithLogOrThrow({
           userId: body.userId,
           targetType: "comment",
           targetId: row.id,
@@ -432,6 +442,7 @@ export const commentsRouter = new Elysia()
         cleanContent = m.cleanText;
         censored = m.result.censored;
         matchedCount = m.result.matchedCount;
+        changes = m.changes;
       } catch (e) {
         const blocked = moderationBlockedHttpBody(e);
         if (blocked) {
@@ -462,7 +473,12 @@ export const commentsRouter = new Elysia()
         });
       }
 
-      return { ok: true };
+      return {
+        ok: true,
+        moderation: censored
+          ? { matchedCount, changes }
+          : { matchedCount: 0, changes: [] },
+      };
     },
     {
       body: t.Object({

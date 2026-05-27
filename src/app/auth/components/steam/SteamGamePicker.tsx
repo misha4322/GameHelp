@@ -23,13 +23,17 @@ export default function SteamGamePicker({
   const [nextOffset, setNextOffset] = useState(0);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
-  const fetchPage = useCallback(async (query: string, offset: number) => {
+  const fetchPage = useCallback(async (query: string, offset: number, signal?: AbortSignal) => {
     const params = new URLSearchParams();
     params.set("offset", String(offset));
     params.set("limit", String(PAGE));
     if (query.trim()) params.set("search", query.trim());
-    const res = await fetch(`/api/steam/games?${params.toString()}`);
+    const res = await fetch(`/api/steam/games?${params.toString()}`, { signal });
+    if (!res.ok) {
+      throw new Error(`Steam API HTTP ${res.status}`);
+    }
     const data = await res.json();
     const list = (data.games || []) as SteamGame[];
     return {
@@ -41,19 +45,24 @@ export default function SteamGamePicker({
 
   const loadInitial = useCallback(
     async (query: string) => {
+      fetchAbortRef.current?.abort();
+      const ac = new AbortController();
+      fetchAbortRef.current = ac;
       setLoading(true);
       try {
-        const { games: list, hasMore: more } = await fetchPage(query, 0);
+        const { games: list, hasMore: more } = await fetchPage(query, 0, ac.signal);
+        if (ac.signal.aborted) return;
         setGames(list);
         setNextOffset(list.length);
         setHasMore(more);
       } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
         console.error("Error searching games:", error);
         setGames([]);
         setHasMore(false);
         setNextOffset(0);
       } finally {
-        setLoading(false);
+        if (!ac.signal.aborted) setLoading(false);
       }
     },
     [fetchPage]
@@ -77,7 +86,7 @@ export default function SteamGamePicker({
   useEffect(() => {
     if (!isOpen) return;
 
-    const delay = search.trim() ? 300 : 0;
+    const delay = search.trim() ? 450 : 0;
     const timer = setTimeout(() => {
       void loadInitial(search);
     }, delay);

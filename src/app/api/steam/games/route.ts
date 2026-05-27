@@ -7,16 +7,12 @@ type SteamAppRow = { appid: number; name: string };
 // Кэшируем список игр Steam (обновляем раз в день)
 let gamesCache: SteamAppRow[] | null = null;
 let cacheTime = 0;
+/** Один запрос к Steam на все параллельные /api/steam/games (поиск печатает много раз подряд). */
+let gamesLoadInFlight: Promise<SteamAppRow[]> | null = null;
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 часа
 
-async function fetchSteamGames(): Promise<SteamAppRow[]> {
+async function loadSteamGamesFromNetwork(): Promise<SteamAppRow[]> {
   const now = Date.now();
-  
-  // Используем кэш если есть
-  if (gamesCache && (now - cacheTime) < CACHE_DURATION) {
-    return gamesCache;
-  }
-
   const STEAM_API_KEY = process.env.STEAM_SECRET;
 
   if (!STEAM_API_KEY) {
@@ -77,6 +73,24 @@ async function fetchSteamGames(): Promise<SteamAppRow[]> {
     // Иначе пробуем старый API
     return await fetchSteamGamesLegacy();
   }
+}
+
+async function fetchSteamGames(): Promise<SteamAppRow[]> {
+  const now = Date.now();
+
+  if (gamesCache && now - cacheTime < CACHE_DURATION) {
+    return gamesCache;
+  }
+
+  if (gamesLoadInFlight) {
+    return gamesLoadInFlight;
+  }
+
+  gamesLoadInFlight = loadSteamGamesFromNetwork().finally(() => {
+    gamesLoadInFlight = null;
+  });
+
+  return gamesLoadInFlight;
 }
 
 // Резервный метод: старый API без ключа (менее надежный)

@@ -57,6 +57,22 @@
   padding: 0 2px;
 }
 
+.moderation-censor-word {
+  text-decoration: line-through;
+  text-decoration-color: rgba(251, 191, 36, 0.9);
+  background: rgba(251, 191, 36, 0.14);
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+.moderation-censor-replacement {
+  font-weight: 800;
+  color: #ddd6fe;
+  background: rgba(124, 58, 237, 0.28);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
 .moderation-blocked-field-wrap {
   margin-top: 10px;
 }

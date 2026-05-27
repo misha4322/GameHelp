@@ -243,6 +243,34 @@
   line-height: 1.5;
 }
 
+.comments-ai-notice {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  background: rgba(124, 58, 237, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.comments-ai-checking {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fde68a;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.comments-textarea-ai-ready {
+  border-color: rgba(167, 139, 250, 0.45) !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
 .comments-editor-actions {
   display: flex;
   justify-content: flex-end;

@@ -1,4 +1,4 @@
-import { applyModerationOrThrow, isModerationBlockedError, ModerationBlockedError } from "./moderation";
+import { applyModerationOrThrow, isModerationBlockedError, ModerationBlockedError } from "./core";
 
 const PROFILE_TEXT_KEYS = [
   "statusText",

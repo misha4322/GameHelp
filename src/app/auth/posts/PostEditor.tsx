@@ -12,6 +12,7 @@ import { useBanRestriction } from "@/contexts/BanRestrictionContext";
 import { formatBanCountdown } from "@/lib/ban-countdown";
 import { emitPostRevisionRefresh } from "@/lib/post-revision-refresh";
 import { readModerationBlockedPayload } from "@/lib/moderation/parse-blocked-response";
+import { requestModerationPreview } from "@/lib/moderation/preview-api";
 import type { ModerationTextMatch } from "@/lib/moderation/moderate-text";
 import type { Category, Tag } from "@/types/forum";
 import type { SteamGame } from "@/types/steam";
@@ -130,6 +131,7 @@ export default function PostEditor({
   const postBlocked = ban.restricted;
   const editorRef = useRef<HTMLDivElement>(null);
   const wasContentModerationMirrorRef = useRef(false);
+  const wasPlainEditorRef = useRef(false);
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [categoryId] = useState(initialCategoryId);
@@ -143,11 +145,14 @@ export default function PostEditor({
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [error, setError] = useState("");
+  const [aiNotice, setAiNotice] = useState("");
   const [modBlockPreview, setModBlockPreview] = useState<{
     sourceField?: string;
     text: string;
     matches: ModerationTextMatch[];
   } | null>(null);
+  const [aiReviewReady, setAiReviewReady] = useState(false);
+  const [aiChecking, setAiChecking] = useState(false);
   const [steamGame, setSteamGame] = useState<SteamGame | null>(null);
 
   const canSubmit = useMemo(() => {
@@ -187,6 +192,16 @@ export default function PostEditor({
     wasContentModerationMirrorRef.current = Boolean(inMirror);
   }, [modBlockPreview, content]);
 
+  const usePlainPostBody = aiChecking || aiReviewReady;
+
+  useEffect(() => {
+    if (wasPlainEditorRef.current && !usePlainPostBody) {
+      const editor = editorRef.current;
+      if (editor) editor.innerHTML = markdownToEditorHtml(content);
+    }
+    wasPlainEditorRef.current = usePlainPostBody;
+  }, [usePlainPostBody, content]);
+
   const effectiveCoverSrc = useMemo(() => {
     if (coverObjectUrl) return coverObjectUrl;
     if (useSteamCover && steamGame?.headerImage) return steamGame.headerImage;
@@ -198,6 +213,7 @@ export default function PostEditor({
     const editor = editorRef.current;
     if (!editor) return;
     setContent(editorToMarkdown(editor));
+    setAiReviewReady(false);
   }
 
   function insertImageAtCaret(url: string) {
@@ -401,6 +417,123 @@ export default function PostEditor({
     return j.category?.id ?? null;
   }
 
+  async function publishPost(titleToSend: string, contentToSend: string) {
+    let uploadedCover: string | null = null;
+
+    if (coverFile) {
+      uploadedCover = await uploadCover(coverFile);
+    }
+
+    let coverImage: string | null;
+    if (uploadedCover) {
+      coverImage = uploadedCover;
+    } else if (useSteamCover && steamGame?.headerImage) {
+      coverImage = steamGame.headerImage;
+    } else if (editSlug) {
+      coverImage = initialCoverUrl ?? null;
+    } else {
+      coverImage = null;
+    }
+
+    let effectiveCategoryId: string | null = categoryId || null;
+    if (steamGame) {
+      const steamCat = await ensureSteamCategoryId(steamGame);
+      if (steamCat) effectiveCategoryId = steamCat;
+    }
+
+    if (editSlug) {
+      const res = await fetch(`/api/posts/${encodeURIComponent(editSlug)}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          title: titleToSend,
+          content: contentToSend,
+          categoryId: effectiveCategoryId,
+          tagIds,
+          coverImage: coverImage ?? null,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        matches?: unknown;
+        post?: { slug?: string };
+      };
+      if (!res.ok) {
+        const blocked = readModerationBlockedPayload(data);
+        if (blocked) {
+          const src = blocked.sourceField;
+          const previewText = src === "title" ? titleToSend : contentToSend;
+          setModBlockPreview({
+            sourceField: src === "title" || src === "content" ? src : "content",
+            text: previewText,
+            matches: blocked.matches,
+          });
+        }
+        throw new Error(typeof data.error === "string" ? data.error : "Ошибка сохранения");
+      }
+      setModBlockPreview(null);
+      const slug = data?.post?.slug ?? editSlug;
+      emitPostRevisionRefresh({ slug });
+      router.push(`/posts/${slug}`);
+      router.refresh();
+      window.setTimeout(() => emitPostRevisionRefresh({ slug }), 300);
+      return;
+    }
+
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId,
+        title: titleToSend,
+        content: contentToSend,
+        categoryId: effectiveCategoryId,
+        tagIds,
+        isPublished: true,
+        coverImage: uploadedCover || (useSteamCover ? steamGame?.headerImage : null) || null,
+      }),
+    });
+
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      code?: string;
+      matches?: unknown;
+      post?: { slug?: string };
+      moderation?: { matchedCount?: number };
+    };
+
+    if (!res.ok) {
+      const blocked = readModerationBlockedPayload(data);
+      if (blocked) {
+        const src = blocked.sourceField;
+        const previewText = src === "title" ? titleToSend : contentToSend;
+        setModBlockPreview({
+          sourceField: src === "title" || src === "content" ? src : "content",
+          text: previewText,
+          matches: blocked.matches,
+        });
+      }
+      throw new Error(typeof data.error === "string" ? data.error : "Ошибка создания поста");
+    }
+
+    setModBlockPreview(null);
+    const fixed = Number(data?.moderation?.matchedCount ?? 0);
+    if (fixed > 0) setAiNotice(`AI исправил ${fixed} запрещённых слов`);
+
+    if (!data?.post?.slug) {
+      throw new Error("Сервер не вернул slug нового поста");
+    }
+
+    router.push(`/posts/${data.post.slug}`);
+    router.refresh();
+  }
+
   async function submit() {
     if (!canSubmit) return;
     if (postBlocked) {
@@ -409,127 +542,118 @@ export default function PostEditor({
     }
 
     setError("");
+    setAiNotice("");
     setModBlockPreview(null);
+
+    if (!usePlainPostBody && editorRef.current) {
+      const fromEditor = editorToMarkdown(editorRef.current).trim();
+      if (fromEditor) setContent(fromEditor);
+    }
+
+    const titleTrim = title.trim();
+    const contentTrim = content.trim();
+
+    if (aiReviewReady) {
+      setIsLoading(true);
+      try {
+        await publishPost(titleTrim, contentTrim);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Сетевая ошибка");
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     setIsLoading(true);
+    setAiChecking(true);
 
     try {
-      let uploadedCover: string | null = null;
+      const [titlePreview, contentPreview] = await Promise.all([
+        requestModerationPreview({
+          text: titleTrim,
+          scope: "posts",
+          userId,
+          sourceField: "title",
+          skipAi: true,
+        }),
+        requestModerationPreview({
+          text: contentTrim,
+          scope: "posts",
+          userId,
+          sourceField: "content",
+        }),
+      ]);
 
-      if (coverFile) {
-        uploadedCover = await uploadCover(coverFile);
-      }
-
-      let finalContent = content.trim();
-
-      let coverImage: string | null;
-      if (uploadedCover) {
-        coverImage = uploadedCover;
-      } else if (useSteamCover && steamGame?.headerImage) {
-        coverImage = steamGame.headerImage;
-      } else if (editSlug) {
-        coverImage = initialCoverUrl ?? null;
-      } else {
-        coverImage = null;
-      }
-
-      let effectiveCategoryId: string | null = categoryId || null;
-      if (steamGame) {
-        const steamCat = await ensureSteamCategoryId(steamGame);
-        if (steamCat) effectiveCategoryId = steamCat;
-      }
-
-      if (editSlug) {
-        const res = await fetch(`/api/posts/${encodeURIComponent(editSlug)}`, {
-          method: "PATCH",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            title: title.trim(),
-            content: finalContent,
-            categoryId: effectiveCategoryId,
-            tagIds,
-            coverImage: coverImage ?? null,
-          }),
+      if (titlePreview.blocked) {
+        setModBlockPreview({
+          sourceField: "title",
+          text: titleTrim,
+          matches: titlePreview.matches,
         });
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          code?: string;
-          matches?: unknown;
-          post?: { slug?: string };
-        };
-        if (!res.ok) {
-          const blocked = readModerationBlockedPayload(data);
-          if (blocked) {
-            const src = blocked.sourceField;
-            const previewText = src === "title" ? title.trim() : finalContent;
-            setModBlockPreview({
-              sourceField: src === "title" || src === "content" ? src : "content",
-              text: previewText,
-              matches: blocked.matches,
-            });
-          }
-          throw new Error(typeof data.error === "string" ? data.error : "Ошибка сохранения");
+        throw new Error("В заголовке есть запрещённые слова — исправьте подчёркнутые.");
+      }
+      if (contentPreview.blocked) {
+        setModBlockPreview({
+          sourceField: "content",
+          text: contentTrim,
+          matches: contentPreview.matches,
+        });
+        throw new Error("В тексте есть запрещённые слова — исправьте подчёркнутые.");
+      }
+
+      const finalTitle = titlePreview.cleanText;
+      const finalContent = contentPreview.cleanText;
+      const titleChanged = finalTitle !== titleTrim;
+      const contentChanged = finalContent !== contentTrim;
+      const censored =
+        (titlePreview.censoredWords ?? titlePreview.matchedCount ?? 0) +
+        (contentPreview.censoredWords ?? contentPreview.matchedCount ?? 0);
+      const aiFailed = contentPreview.aiModerationStatus === "failed";
+      const quotaHit =
+        contentPreview.geminiQuotaExceeded || titlePreview.geminiQuotaExceeded;
+
+      if (titleChanged || contentChanged) {
+        setTitle(finalTitle);
+        setContent(finalContent);
+        setAiReviewReady(true);
+        if (quotaHit) {
+          setAiNotice(
+            censored > 0
+              ? `Лимит Gemini (429) — применены правила сайта (${censored} замен). Подождите 2 мин или включите биллинг. Затем «Опубликовать пост».`
+              : "Лимит Gemini (429) исчерпан. Подождите ~2 минуты или проверьте квоту в Google AI Studio. Правила сайта: добавьте фразы в moderation_words."
+          );
+        } else if (aiFailed) {
+          setAiNotice(
+            censored > 0
+              ? `Gemini не ответил — применены только правила сайта (${censored} замен). Проверьте GEMINI_MODEL=gemma-4-31b-it и ключ API.`
+              : "Gemini не ответил — проверьте GOOGLE_GEMINI_API_KEY, модель gemma-4-31b-it и moderation_words."
+          );
+        } else {
+          setAiNotice(
+            censored > 0
+              ? `Модерация применена (${censored} замен). Проверьте текст и нажмите «Опубликовать пост».`
+              : "Текст обновлён. Проверьте и нажмите «Опубликовать пост»."
+          );
         }
-        setModBlockPreview(null);
-        const slug = data?.post?.slug ?? editSlug;
-        emitPostRevisionRefresh({ slug });
-        router.push(`/posts/${slug}`);
-        router.refresh();
-        window.setTimeout(() => emitPostRevisionRefresh({ slug }), 300);
         return;
       }
 
-      const res = await fetch("/api/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          title: title.trim(),
-          content: finalContent,
-          categoryId: effectiveCategoryId,
-          tagIds,
-          isPublished: true,
-          coverImage: uploadedCover || (useSteamCover ? steamGame?.headerImage : null) || null,
-        }),
-      });
-
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        code?: string;
-        matches?: unknown;
-        post?: { slug?: string };
-      };
-
-      if (!res.ok) {
-        const blocked = readModerationBlockedPayload(data);
-        if (blocked) {
-          const src = blocked.sourceField;
-          const previewText = src === "title" ? title.trim() : finalContent;
-          setModBlockPreview({
-            sourceField: src === "title" || src === "content" ? src : "content",
-            text: previewText,
-            matches: blocked.matches,
-          });
-        }
-        throw new Error(typeof data.error === "string" ? data.error : "Ошибка создания поста");
+      if ((aiFailed || quotaHit) && censored === 0) {
+        setAiNotice(
+          quotaHit
+            ? "Лимит Gemini (429): слишком много запросов. Подождите 2 минуты или отключите GEMINI_POLISH_ENABLED. Добавьте фразы в moderation_words для regex."
+            : "Модерация не сработала: проверьте GEMINI_MODEL=gemma-4-31b-it, ключ API и фразы в moderation_words."
+        );
+        return;
       }
 
-      setModBlockPreview(null);
-
-      if (!data?.post?.slug) {
-        throw new Error("Сервер не вернул slug нового поста");
-      }
-
-      router.push(`/posts/${data.post.slug}`);
-      router.refresh();
+      await publishPost(titleTrim, contentTrim);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Сетевая ошибка");
     } finally {
       setIsLoading(false);
+      setAiChecking(false);
     }
   }
 
@@ -596,7 +720,10 @@ export default function PostEditor({
                 <input
                   className={styles.input}
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setAiReviewReady(false);
+                  }}
                   placeholder="Например: Лучшие настройки для CS2"
                 />
               )}
@@ -604,6 +731,16 @@ export default function PostEditor({
 
             <div className={styles.field}>
               <label className={styles.label}>Текст поста</label>
+              {aiChecking ? (
+                <div className={styles.aiCheckingBanner} role="status">
+                  ИИ модерирует текст (Gemini + правила из админки)…
+                </div>
+              ) : null}
+              {aiReviewReady && !aiChecking ? (
+                <div className={styles.aiInlineBanner} role="status">
+                  {aiNotice || "Текст после модерации — доправьте при необходимости и нажмите «Опубликовать пост»."}
+                </div>
+              ) : null}
               {modBlockPreview?.sourceField === "content" ? (
                 <ModerationBlockedMirrorTextarea
                   wrapClassName=""
@@ -617,6 +754,18 @@ export default function PostEditor({
                   textareaClassName={styles.postBodyMirrorInner}
                   rows={14}
                   placeholder="Опиши тему, вопрос, мнение или гайд. Картинки вставляются кнопкой ниже после исправления текста."
+                />
+              ) : usePlainPostBody ? (
+                <textarea
+                  className={`${styles.richEditor} ${styles.postBodyPlain}${aiReviewReady ? ` ${styles.richEditorAiReady}` : ""}`}
+                  value={content}
+                  onChange={(e) => {
+                    setContent(e.target.value);
+                    setAiReviewReady(false);
+                  }}
+                  rows={18}
+                  disabled={aiChecking}
+                  placeholder="Исправленный текст — доправьте при необходимости и нажмите «Опубликовать пост»"
                 />
               ) : (
                 <div
@@ -832,11 +981,17 @@ export default function PostEditor({
             onClick={() => void submit()}
             className={styles.submitButton}
           >
-            {isLoading
-              ? "Сохранение..."
-              : editSlug
-                ? "Сохранить изменения"
-                : "Опубликовать пост"}
+            {aiChecking
+              ? "ИИ проверяет…"
+              : isLoading
+                ? "Сохранение..."
+                : aiReviewReady
+                  ? editSlug
+                    ? "Сохранить изменения"
+                    : "Опубликовать пост"
+                  : editSlug
+                    ? "Проверить и сохранить"
+                    : "Проверить и опубликовать"}
           </button>
         </div>
       </div>
@@ -846,6 +1001,12 @@ export default function PostEditor({
           {error}
         </div>
       ) : null}
+      {aiNotice ? (
+        <div className={styles.hint} role="status">
+          {aiNotice}
+        </div>
+      ) : null}
+
     </div>
   );
 }

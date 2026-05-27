@@ -5,7 +5,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { authOptions } from "@/lib/auth-options";
 import { db } from "@/server/db";
 import { postLikes, postTags, posts, users } from "@/server/db/schema";
-import { recordUserPostOpenSignal } from "@/server/recommendation-signals";
+import { recordUserPostOpenSignal } from "@/server/services/recommendation-signals";
 import { checkUserPostingBan } from "@/lib/user-ban";
 import { resolveUserUuid } from "@/lib/user-utils";
 import { applyModerationOrThrow, moderationBlockedHttpBody } from "@/server/moderation";
